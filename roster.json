@@ -51,7 +51,7 @@
     ],
     "water": {
       "on": true,
-      "level": 38,
+      "level": 38.3,
       "block": true
     },
     "env": {
@@ -72,6 +72,9 @@
     "bar": "ui:bar:mainmenubar.png:212369",
     "slot": "ui:slot:ui-quickslot2.png:575",
     "hl": "ui:hl:buttonhilight-square.png:1132",
+    "pf": null,
+    "pa": null,
+    "sb": null,
     "ss": 1.7,
     "crop": {
       "bar": [
@@ -85,6 +88,14 @@
     },
     "capS": 165,
     "capX": -44,
-    "capY": null
+    "capY": null,
+    "pfX": null,
+    "pfY": null,
+    "pfW": null,
+    "pfF": false,
+    "paX": null,
+    "paY": null,
+    "paW": null,
+    "paF": false
   }
 }
