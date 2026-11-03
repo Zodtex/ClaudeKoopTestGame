@@ -90,6 +90,14 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .actionbar.wowui .ab-cap.right { margin-left: -18px; }
 .actionbar.wowbar .ab-frame { background: var(--bar-img) center / 100% 100% no-repeat; border: 0; box-shadow: none; }
 .actionbar.wowbar .ab-frame::before { display: none; }
+.actionbar.wowslot .ab-slot { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+.actionbar.wowslot .ab-slot::before { content: ""; position: absolute; left: 50%; top: 50%; width: calc(100% * var(--slot-scale, 1.8)); height: calc(100% * var(--slot-scale, 1.8)); transform: translate(-50%, -50%); background: var(--slot-img) center / 100% 100% no-repeat; pointer-events: none; }
+.actionbar.wowslot .ab-slot > * { position: relative; z-index: 1; }
+.actionbar.wowslot .ab-slot .hk { position: absolute; }
+.actionbar.wowslot .ab-slot .cd { position: absolute; }
+.actionbar.wowhl .ab-slot::after { content: ""; position: absolute; inset: 0; background: var(--hl-img) center / 100% 100% no-repeat; mix-blend-mode: screen; opacity: 0; pointer-events: none; z-index: 2; }
+.actionbar.wowhl .ab-slot:hover::after { opacity: 1; }
+.actionbar.wowhl .ab-slot:hover { border-color: inherit; }
 .ab-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(10,12,22,0.94); border: 1px solid #9a8a5a; border-radius: 4px; padding: 6px 10px; font-size: 12.5px; color: #fff; pointer-events: none; }
 .ab-tip b { display: block; color: #ffd100; font-weight: 600; margin-bottom: 2px; }
 @media (max-width: 640px) {
@@ -293,7 +301,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 00:20</p>
+<p class="ver">v 04.11. 00:35</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -483,9 +491,19 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       </div>
       <input type="file" id="uiCapInput" accept=".png,.jpg,.jpeg,image/*" hidden>
       <input type="file" id="uiBarInput" accept=".png,.jpg,.jpeg,image/*" hidden>
+      <div class="btnrow">
+        <button class="btn ghost" id="uiSlotPick">Feld-Rahmen wählen</button>
+        <button class="btn ghost" id="uiHlPick">Hover-Glanz wählen</button>
+      </div>
+      <input type="file" id="uiSlotInput" accept=".png,.jpg,.jpeg,image/*" hidden>
+      <input type="file" id="uiHlInput" accept=".png,.jpg,.jpeg,image/*" hidden>
+      <div class="field">
+        <label for="uiSlotScale">Rahmengröße</label>
+        <div><input type="range" id="uiSlotScale" min="1" max="2.2" step="0.05" value="1.8"><span class="val" id="uiSlotScaleVal">1.80×</span></div>
+      </div>
       <div class="netstate" id="uiState">Eigene Zierleiste.</div>
       <button class="btn ghost danger" id="uiClear">Zurück zur eigenen Leiste</button>
-      <p class="hint">In wow.export im Tab „Textures" nach „mainmenubar" suchen (z. B. die Endkappe mit dem Greif) und als PNG exportieren. Die linke Kappe wird rechts automatisch gespiegelt. Die Grafiken gehen wie Modelle nur an deine Mitspieler, nicht auf GitHub.</p>
+      <p class="hint">In wow.export im Tab „Textures" nach „mainmenubar" suchen (z. B. die Endkappe mit dem Greif) und als PNG exportieren. Die linke Kappe wird rechts automatisch gespiegelt. Für die Felder unter „buttons" z. B. „ui-quickslot2" (Rahmen) und „buttonhilight-square" (Glanz). In WoW ist der Rahmen größer als das Feld – mit „Rahmengröße" anpassen. Die Grafiken gehen wie Modelle nur an deine Mitspieler, nicht auf GitHub.</p>
     </div>
     <div class="asec">
       <span class="lbl">Musik &amp; Klang</span>
@@ -1536,7 +1554,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) { waitFor(sl.mk); requestModel(msg.id, sl.mk); }
       if (mapCfg && !mapLoaded && !mapLoading) { waitFor(mapCfg.key); requestModel(msg.id, mapCfg.key); }
       if (mapCfg && mapCfg.audio) for (const k of [mapCfg.audio.music, mapCfg.audio.amb]) if (k && !audioHave.has(k)) requestModel(msg.id, k);
-      if (uiCfg) for (const k of [uiCfg.cap, uiCfg.bar]) if (k && !uiHave.has(k)) requestModel(msg.id, k);
+      if (uiCfg) for (const k of [uiCfg.cap, uiCfg.bar, uiCfg.slot, uiCfg.hl]) if (k && !uiHave.has(k)) requestModel(msg.id, k);
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c || prev.ld !== msg.st.ld || prev.cn !== msg.st.cn) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
@@ -2555,8 +2573,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const cleanUi = u => {
     if (!u || typeof u !== 'object') return null;
     const k = v => typeof v === 'string' && v.startsWith('ui:') ? v.slice(0, 220) : null;
-    const o = { cap: k(u.cap), bar: k(u.bar) };
-    return o.cap || o.bar ? o : null;
+    const o = { cap: k(u.cap), bar: k(u.bar), slot: k(u.slot), hl: k(u.hl), ss: Number.isFinite(+u.ss) ? Math.max(1, Math.min(2.2, +u.ss)) : 1.8 };
+    return o.cap || o.bar || o.slot || o.hl ? o : null;
   };
   function setUiCfg(u, fromPeer) { uiCfg = cleanUi(u); applyUi(); }
   async function applyUi() {
@@ -2573,15 +2591,26 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const u = URL.createObjectURL(fb[0]); uiUrls.push(u);
       bar.style.setProperty('--bar-img', `url("${u}")`); bar.classList.add('wowbar');
     } else { bar.style.removeProperty('--bar-img'); bar.classList.remove('wowbar'); }
+    const fs = uiCfg && uiCfg.slot ? await sharedGet(uiCfg.slot) : null, fh = uiCfg && uiCfg.hl ? await sharedGet(uiCfg.hl) : null;
+    if (fs) uiHave.add(uiCfg.slot); if (fh) uiHave.add(uiCfg.hl);
+    const css = (cls, prop, files) => {
+      if (files && files[0]) { const u = URL.createObjectURL(files[0]); uiUrls.push(u); bar.style.setProperty(prop, `url("${u}")`); bar.classList.add(cls); }
+      else { bar.style.removeProperty(prop); bar.classList.remove(cls); }
+    };
+    css('wowslot', '--slot-img', fs); css('wowhl', '--hl-img', fh);
+    const ss = uiCfg ? uiCfg.ss : 1.8;
+    bar.style.setProperty('--slot-scale', ss); $('uiSlotScale').value = ss; $('uiSlotScaleVal').textContent = (+ss).toFixed(2) + '×';
     const st = $('uiState');
-    st.textContent = !uiCfg ? 'Eigene Zierleiste.' : `${uiCfg.cap ? (fc ? 'Endkappe aktiv' : 'Endkappe wird übertragen …') : 'Eigene Endkappe'} · ${uiCfg.bar ? (fb ? 'Leiste aktiv' : 'Leiste wird übertragen …') : 'eigene Leiste'}`;
+    const part = (key, have, label) => key ? (have ? label : label + ' wird übertragen …') : null;
+    const parts = uiCfg ? [part(uiCfg.cap, fc, 'Endkappe'), part(uiCfg.bar, fb, 'Leiste'), part(uiCfg.slot, fs, 'Feld-Rahmen'), part(uiCfg.hl, fh, 'Hover-Glanz')].filter(Boolean) : [];
+    st.textContent = parts.length ? 'Aktiv: ' + parts.join(' · ') : 'Eigene Zierleiste.';
     st.className = 'netstate' + (uiCfg ? ' ok' : '');
   }
   async function pickUi(kind, list) {
     const f = [...list].find(x => /\.(png|jpe?g)$/i.test(x.name)); if (!f || !isAdmin) return;
     const key = `ui:${kind}:${base(f.name)}:${f.size}`;
     sharedPut(key, [f]); uiHave.add(key);
-    uiCfg = Object.assign({ cap: null, bar: null }, uiCfg, { [kind]: key });
+    uiCfg = Object.assign({ cap: null, bar: null, slot: null, hl: null, ss: 1.8 }, uiCfg, { [kind]: key });
     await applyUi();
     if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg });
   }
@@ -2589,6 +2618,17 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('uiBarPick').onclick = () => $('uiBarInput').click();
   $('uiCapInput').onchange = e => { pickUi('cap', e.target.files); e.target.value = ''; };
   $('uiBarInput').onchange = e => { pickUi('bar', e.target.files); e.target.value = ''; };
+  $('uiSlotPick').onclick = () => $('uiSlotInput').click();
+  $('uiHlPick').onclick = () => $('uiHlInput').click();
+  $('uiSlotInput').onchange = e => { pickUi('slot', e.target.files); e.target.value = ''; };
+  $('uiHlInput').onchange = e => { pickUi('hl', e.target.files); e.target.value = ''; };
+  let uiTimer = 0;
+  $('uiSlotScale').oninput = e => {
+    const v = +e.target.value; $('uiSlotScaleVal').textContent = v.toFixed(2) + '×';
+    $('actionBar').style.setProperty('--slot-scale', v);
+    if (!uiCfg) return; uiCfg.ss = v;
+    clearTimeout(uiTimer); uiTimer = setTimeout(() => { if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg }); }, 300);
+  };
   $('uiClear').onclick = () => { uiCfg = null; applyUi(); if (net.ready) netSend({ t: 'ui', id: net.id, ui: null }); };
 
   // ---------- Spielmenü & Einstellungen ----------
