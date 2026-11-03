@@ -70,9 +70,11 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
   box-shadow: inset 0 2px 0 #d9b25e, inset 0 -6px 12px rgba(0,0,0,0.45), 0 -4px 18px rgba(0,0,0,0.45); }
 .ab-frame::before { content: ""; position: absolute; left: 10px; right: 10px; top: 4px; height: 2px; background: linear-gradient(90deg, transparent, #b8924a 12%, #f0cf7d 50%, #b8924a 88%, transparent); opacity: 0.7; }
 .ab-slots { display: flex; gap: 6px; }
-.ab-cap { width: 86px; height: 86px; margin-bottom: -4px; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
-.ab-cap.left { margin-right: -14px; z-index: 1; }
-.ab-cap.right { margin-left: -14px; z-index: 1; transform: scaleX(-1); }
+.ab-cap { width: var(--cap-size, 86px); height: var(--cap-size, 86px); margin-bottom: -4px; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+.ab-cap.left { margin-right: var(--cap-x, -14px); z-index: 1; transform: translateY(calc(-1 * var(--cap-y, 0px))); }
+.ab-cap.right { margin-left: var(--cap-x, -14px); z-index: 1; transform: translateY(calc(-1 * var(--cap-y, 0px))) scaleX(-1); }
+.actionbar.capdrag .ab-cap { pointer-events: auto; cursor: grab; outline: 1px dashed rgba(255,211,77,0.8); outline-offset: 2px; }
+.actionbar.capdrag .ab-cap:active { cursor: grabbing; }
 .ab-slot { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 5px; cursor: pointer; overflow: hidden;
   background: radial-gradient(circle at 50% 38%, #4d4a44, #1d1b18 75%); border: 2px solid #6b5326;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.8), inset 0 4px 10px rgba(0,0,0,0.6); color: #f3d98f; }
@@ -85,9 +87,9 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .ab-slot .cd { position: absolute; inset: 0; pointer-events: none; }
 .ab-slot.empty { cursor: default; background: radial-gradient(circle at 50% 38%, #2f2c28, #151412 75%); }
 .ab-cap img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: block; }
-.actionbar.wowui .ab-cap { width: 128px; height: 128px; margin-bottom: 0; }
-.actionbar.wowui .ab-cap.left { margin-right: -18px; }
-.actionbar.wowui .ab-cap.right { margin-left: -18px; }
+.actionbar.wowui .ab-cap { width: var(--cap-size, 128px); height: var(--cap-size, 128px); margin-bottom: 0; }
+.actionbar.wowui .ab-cap.left { margin-right: var(--cap-x, -18px); }
+.actionbar.wowui .ab-cap.right { margin-left: var(--cap-x, -18px); }
 .actionbar.wowbar .ab-frame { background: var(--bar-img) center / 100% 100% no-repeat; border: 0; box-shadow: none; }
 .actionbar.wowbar .ab-frame::before { display: none; }
 .actionbar.wowslot .ab-slot { background: transparent; border: 0; box-shadow: none; overflow: visible; }
@@ -329,7 +331,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 01:10</p>
+<p class="ver">v 04.11. 01:25</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -529,6 +531,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         <label for="uiSlotScale">Rahmengröße</label>
         <div><input type="range" id="uiSlotScale" min="1" max="2.2" step="0.05" value="1.8"><span class="val" id="uiSlotScaleVal">1.80×</span></div>
       </div>
+      <div class="field">
+        <label for="capSize">Kopf-Größe</label>
+        <div><input type="range" id="capSize" min="40" max="240" step="1" value="128"><span class="val" id="capSizeVal">Standard</span></div>
+      </div>
+      <div class="field">
+        <label for="capX">Kopf-Abstand</label>
+        <div><input type="range" id="capX" min="-140" max="80" step="1" value="-18"><span class="val" id="capXVal">Standard</span></div>
+      </div>
+      <div class="field">
+        <label for="capY">Kopf-Höhe</label>
+        <div><input type="range" id="capY" min="-80" max="120" step="1" value="0"><span class="val" id="capYVal">Standard</span></div>
+      </div>
+      <label class="check"><input type="checkbox" id="capDrag"> Köpfe mit der Maus verschieben</label>
+      <button class="btn ghost" id="capReset">Köpfe zurücksetzen</button>
       <div class="netstate" id="uiState">Eigene Zierleiste.</div>
       <div class="cropbox" id="cropBox">
         <div class="field">
@@ -2633,7 +2649,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const clean = list.slice(0, 6).filter(r => Array.isArray(r) && r.length === 4 && r.every(n => Number.isFinite(n) && n >= 0 && n <= 8192) && r[2] >= 1 && r[3] >= 1).map(r => r.map(Math.round));
       if (clean.length) o.crop[kind] = clean;
     }
-    return o.cap || o.bar || o.slot || o.hl ? o : null;
+    const n = (v, lo, hi) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, Math.round(+v))) : null;
+    o.capS = n(u.capS, 40, 240); o.capX = n(u.capX, -140, 80); o.capY = n(u.capY, -80, 120);
+    return o.cap || o.bar || o.slot || o.hl || o.capS !== null || o.capX !== null || o.capY !== null ? o : null;
   };
   function setUiCfg(u, fromPeer) { uiCfg = cleanUi(u); applyUi(); }
   // Sammeldateien: aus einem großen Bild einen oder mehrere Ausschnitte nehmen und nebeneinandersetzen
@@ -2666,6 +2684,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     };
     await css('wowbar', '--bar-img', fb, 'bar'); await css('wowslot', '--slot-img', fs, 'slot'); await css('wowhl', '--hl-img', fh, 'hl');
     setTimeout(() => old.forEach(URL.revokeObjectURL), 1000);
+    applyCapPos();
     const ss = uiCfg ? uiCfg.ss : 1.8;
     bar.style.setProperty('--slot-scale', ss); $('uiSlotScale').value = ss; $('uiSlotScaleVal').textContent = (+ss).toFixed(2) + '×';
     const st = $('uiState');
@@ -2689,6 +2708,55 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('uiBarPick').onclick = () => $('uiBarInput').click();
   $('uiCapInput').onchange = e => { pickUi('cap', e.target.files); e.target.value = ''; };
   $('uiBarInput').onchange = e => { pickUi('bar', e.target.files); e.target.value = ''; };
+  // ---------- Endkappen (Köpfe) verschieben ----------
+  function capDefaults() { return $('actionBar').classList.contains('wowui') ? { s: 128, x: -18, y: 0 } : { s: 86, x: -14, y: 0 }; }
+  function applyCapPos() {
+    const bar = $('actionBar'), d = capDefaults();
+    const v = { s: uiCfg && uiCfg.capS !== null && uiCfg.capS !== undefined ? uiCfg.capS : null, x: uiCfg && uiCfg.capX !== null && uiCfg.capX !== undefined ? uiCfg.capX : null, y: uiCfg && uiCfg.capY !== null && uiCfg.capY !== undefined ? uiCfg.capY : null };
+    const set = (prop, val) => val === null ? bar.style.removeProperty(prop) : bar.style.setProperty(prop, val + 'px');
+    set('--cap-size', v.s); set('--cap-x', v.x); set('--cap-y', v.y);
+    $('capSize').value = v.s ?? d.s; $('capX').value = v.x ?? d.x; $('capY').value = v.y ?? d.y;
+    $('capSizeVal').textContent = v.s === null ? 'Standard' : v.s + ' px';
+    $('capXVal').textContent = v.x === null ? 'Standard' : v.x + ' px';
+    $('capYVal').textContent = v.y === null ? 'Standard' : v.y + ' px';
+  }
+  function setCap(patch) {
+    uiCfg = Object.assign({ cap: null, bar: null, slot: null, hl: null, ss: 1.8, crop: {}, capS: null, capX: null, capY: null }, uiCfg, patch);
+    applyCapPos();
+    clearTimeout(uiSendTimer); uiSendTimer = setTimeout(() => { if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg }); }, 300);
+  }
+  $('capSize').oninput = e => setCap({ capS: +e.target.value });
+  $('capX').oninput = e => setCap({ capX: +e.target.value });
+  $('capY').oninput = e => setCap({ capY: +e.target.value });
+  $('capReset').onclick = () => setCap({ capS: null, capX: null, capY: null });
+  $('capDrag').onchange = e => {
+    $('actionBar').classList.toggle('capdrag', e.target.checked);
+    if (e.target.checked) $('adminPanel').hidden = true; // Panel aus dem Weg, damit man die Köpfe sieht
+  };
+  // Ziehen: waagrecht = Abstand (gespiegelt für rechts), senkrecht = Höhe; Mausrad = Größe
+  let capDragSt = null;
+  document.querySelectorAll('.ab-cap').forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      if (!$('actionBar').classList.contains('capdrag')) return;
+      e.preventDefault(); el.setPointerCapture(e.pointerId);
+      const d = capDefaults();
+      capDragSt = { x0: e.clientX, y0: e.clientY, cx: uiCfg && uiCfg.capX != null ? uiCfg.capX : d.x, cy: uiCfg && uiCfg.capY != null ? uiCfg.capY : d.y, right: el.classList.contains('right') };
+    });
+    el.addEventListener('pointermove', e => {
+      if (!capDragSt) return;
+      const dx = e.clientX - capDragSt.x0, dy = e.clientY - capDragSt.y0;
+      setCap({ capX: Math.max(-140, Math.min(80, Math.round(capDragSt.cx + (capDragSt.right ? dx : -dx)))), capY: Math.max(-80, Math.min(120, Math.round(capDragSt.cy - dy))) });
+    });
+    const up = () => { capDragSt = null; };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    el.addEventListener('wheel', e => {
+      if (!$('actionBar').classList.contains('capdrag')) return;
+      e.preventDefault();
+      const cur = uiCfg && uiCfg.capS != null ? uiCfg.capS : capDefaults().s;
+      setCap({ capS: Math.max(40, Math.min(240, cur + (e.deltaY < 0 ? 4 : -4))) });
+    }, { passive: false });
+  });
+
   // ---------- Ausschnitt-Editor ----------
   let edKind = 'bar', edPiece = 0, edBmp = null, edBmpKey = null, edDrag = null, uiSendTimer = 0;
   function uiChanged() { applyUi(); clearTimeout(uiSendTimer); uiSendTimer = setTimeout(() => { if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg }); }, 400); }
