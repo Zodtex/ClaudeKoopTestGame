@@ -138,7 +138,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 18:00</p>
+<p class="ver">v 03.11. 18:30</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -281,7 +281,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       </div>
       <input type="file" id="mapInput" webkitdirectory multiple hidden>
       <div class="netstate" id="mapState">Keine Karte. Es gilt das Übungsfeld.</div>
-      <p class="hint">In wow.export unter „Maps" Kacheln markieren und als OBJ exportieren. Wähle dann den Ordner mit den adt_…obj-Dateien. Speichern für alle mit „Dauerhaft speichern".</p>
+      <p class="hint">In wow.export unter „Maps" Kacheln markieren und als OBJ exportieren. Wähle dann deinen <b>obersten</b> Exportordner (der „maps" und „world" enthält), damit auch Bäume und Gebäude gefunden werden. Speichern für alle mit „Dauerhaft speichern".</p>
     </div>
     <div class="asec">
       <span class="lbl">Animation abspielen</span>
@@ -617,7 +617,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   });
   const base = n => decodeURIComponent(String(n).split('?')[0].split(/[\\/]/).pop()).toLowerCase();
 
-  const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g)$/i;
+  const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g|csv)$/i;
 
   // Lädt ein wow.export-Modell aus einer Dateiliste; Texturen werden über den Dateinamen zugeordnet
   async function parseModel(fileList) {
@@ -1512,6 +1512,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
 
   // ---------- Karte aus wow.export (ADT-Kacheln als OBJ) ----------
+  let mapPlaced = 0;
   let mapCfg = null, mapLoaded = false, mapLoading = false, mapGroup = null, mapIndex = null, mapUrls = [];
   let repoMap = null;
   const spawn = new THREE.Vector3(0, 0, 0);
@@ -1567,22 +1568,43 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     return 'map:' + (tiles.join('+') || 'karte').slice(0, 190);
   }
   // Nur die Dateien, die die Kacheln brauchen: OBJ, MTL und die Texturen aus den MTL-Dateien
+  const csvFor = (files, stem) => files.find(f => base(f.name) === stem + '_modelplacementinformation.csv');
+  function parseCsv(txt) {
+    const lines = txt.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split(';');
+    return lines.slice(1).map(l => { const c = l.split(';'); const r = {}; head.forEach((h, i) => r[h] = c[i]); return r; });
+  }
+  async function addObjWithMaterials(files, obj, out) {
+    out.add(obj);
+    const stem = base(obj.name).replace(/\.obj$/, '');
+    const mtl = files.find(f => base(f.name) === stem + '.mtl'); if (!mtl) return;
+    out.add(mtl);
+    for (const line of (await mtl.text()).split(/\r?\n/)) {
+      const m = line.trim().match(/^map_\w+\s+(?:-\S+\s+\S+\s+)*(.+)$/i); if (!m) continue;
+      const want = base(m[1].trim()); const hit = files.find(f => base(f.name) === want); if (hit) out.add(hit);
+    }
+  }
+  // Nur die Dateien, die die Karte braucht: Kacheln, ihre Objekt-Listen und die darin genannten Bäume/Gebäude samt Texturen
   async function pickMapFiles(fileList) {
     const files = [...fileList];
     let tiles = files.filter(isTile);
     if (!tiles.length) tiles = files.filter(f => /\.obj$/i.test(f.name));
-    const out = new Set(tiles);
+    const out = new Set();
+    let objects = 0, missing = 0;
+    const done = new Set();
     for (const t of tiles) {
-      const stem = base(t.name).replace(/\.obj$/, '');
-      const mtl = files.find(f => base(f.name) === stem + '.mtl'); if (!mtl) continue;
-      out.add(mtl);
-      const txt = await mtl.text();
-      for (const line of txt.split(/\r?\n/)) {
-        const m = line.trim().match(/^map_\w+\s+(?:-\S+\s+\S+\s+)*(.+)$/i); if (!m) continue;
-        const want = base(m[1].trim()); const hit = files.find(f => base(f.name) === want); if (hit) out.add(hit);
+      await addObjWithMaterials(files, t, out);
+      const csv = csvFor(files, base(t.name).replace(/\.obj$/, '')); if (!csv) continue;
+      out.add(csv);
+      for (const r of parseCsv(await csv.text())) {
+        const want = base(String(r.ModelFile || '').replace(/\\/g, '/')); if (!want || done.has(want)) continue;
+        done.add(want);
+        const obj = files.find(f => base(f.name) === want);
+        if (obj) { await addObjWithMaterials(files, obj, out); objects++; } else missing++;
       }
     }
-    return [...out];
+    return { files: [...out], objects, missing };
   }
 
   async function loadMap(fileList) {
@@ -1597,7 +1619,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const own = new Set(urls);
       const manager = new THREE.LoadingManager();
       manager.setURLModifier(url => (url.startsWith('data:') || own.has(url)) ? url : (map[base(url)] || url));
-      const group = new THREE.Group();
+      const group = new THREE.Group(), terrain = new THREE.Group(), deco = new THREE.Group();
+      group.add(terrain, deco);
       for (const t of tiles) {
         const stem = base(t.name).replace(/\.obj$/, '');
         const loader = new THREE.OBJLoader(manager);
@@ -1608,14 +1631,49 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           o.receiveShadow = true; o.castShadow = false;
           (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) m.map.encoding = THREE.sRGBEncoding; m.side = THREE.DoubleSide; if (m.specular) m.specular.setScalar(0); m.needsUpdate = true; });
         });
-        group.add(obj);
+        terrain.add(obj);
+      }
+      // Bäume, Pflanzen und Gebäude aus den ModelPlacementInformation-Listen (wow.export)
+      const MAX = 51200 / 3, D = Math.PI / 180, templates = new Map();
+      let placed = 0;
+      for (const t of tiles) {
+        const csv = csvFor(files, base(t.name).replace(/\.obj$/, '')); if (!csv) continue;
+        for (const r of parseCsv(await csv.text())) {
+          const name = base(String(r.ModelFile || '').replace(/\\/g, '/'));
+          if (!name || !map[name]) continue;
+          if (!templates.has(name)) {
+            let tpl = null;
+            try {
+              const stem = name.replace(/\.obj$/, ''), loader = new THREE.OBJLoader(manager);
+              if (map[stem + '.mtl']) { const mats = await new THREE.MTLLoader(manager).loadAsync(map[stem + '.mtl']); mats.preload(); loader.setMaterials(mats); }
+              tpl = await loader.loadAsync(map[name]);
+              tpl.traverse(o => {
+                if (!o.isMesh) return;
+                o.castShadow = true; o.receiveShadow = true;
+                (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) { m.map.encoding = THREE.sRGBEncoding; m.alphaTest = 0.5; } m.transparent = false; m.side = THREE.DoubleSide; if (m.specular) m.specular.setScalar(0); m.needsUpdate = true; });
+              });
+            } catch (e) { console.warn('Objekt nicht geladen:', name, e); }
+            templates.set(name, tpl);
+          }
+          const tpl = templates.get(name); if (!tpl) continue;
+          const px = +r.PositionX, py = +r.PositionY, pz = +r.PositionZ;
+          if (![px, py, pz].every(Number.isFinite)) continue;
+          const o = tpl.clone();
+          // Platzierungs-Koordinaten → OBJ-Raum der Kacheln (wie das wow.export-Blender-Add-on)
+          o.position.set(MAX - px, py, MAX - pz);
+          o.rotation.set((+r.RotationZ || 0) * D, ((+r.RotationY || 0) + 90) * D, -(+r.RotationX || 0) * D, 'YZX');
+          const sc = +r.ScaleFactor; o.scale.setScalar(Number.isFinite(sc) && sc > 0 ? sc : 1);
+          deco.add(o); placed++;
+        }
       }
       // Karte um den Ursprung zentrieren, tiefster Punkt auf Höhe 0
-      const box = new THREE.Box3().setFromObject(group), ctr = box.getCenter(new THREE.Vector3());
+      const box = new THREE.Box3().setFromObject(terrain), ctr = box.getCenter(new THREE.Vector3());
       group.position.set(-ctr.x, -box.min.y, -ctr.z);
       unloadMap(false);
       mapGroup = group; mapUrls = urls; scene.add(group);
-      mapIndex = buildIndex(group);
+      group.updateMatrixWorld(true);
+      mapIndex = buildIndex(terrain);
+      mapPlaced = placed;
       propsGroup.visible = false; ground.visible = false;
       scene.fog.near = 180; scene.fog.far = 1400;
       // Startpunkt: Mitte der Karte, sonst spiralförmig die nächste begehbare Stelle
@@ -1626,7 +1684,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       spawn.set(...(found || [0, 0, 0]));
       mapLoaded = true;
       if (mode !== 'play' || !found || groundAt(player.position.x, player.position.z) === null) resetPlayer();
-      mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}.`, 'ok');
+      mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}${placed ? ` · ${placed} Objekte` : ''}.`, 'ok');
     } catch (e) {
       console.error(e); mapMsg(`Karte konnte nicht geladen werden: ${e.message || e}`, 'err');
     } finally { mapLoading = false; }
@@ -1664,13 +1722,15 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const all = [...e.target.files]; e.target.value = '';
     if (!isAdmin) return;
     mapMsg('Durchsuche Kartenordner …');
-    const files = await pickMapFiles(all);
+    const picked = await pickMapFiles(all), files = picked.files;
     if (!files.some(f => /\.obj$/i.test(f.name))) { mapMsg('Keine adt_…obj-Dateien gefunden. Exportiere die Kacheln in wow.export als OBJ.', 'err'); return; }
+    if (picked.missing) console.warn(picked.missing + ' Objektmodelle nicht im Ordner gefunden');
     const key = mapKeyFor(files);
     sharedPut(key, files);
     unloadMap(false); mapLoaded = false;
     mapCfg = { key, name: ($('mapName').value.trim() || 'Karte').slice(0, 40) };
     await loadMap(files);
+    if (picked.missing && mapLoaded) mapMsg(`${$('mapState').textContent} ${picked.missing} Objektarten fehlen – wähle den obersten Exportordner (mit „maps" und „world").`, 'err');
     broadcastMap();
   };
   $('mapName').onchange = () => { if (mapCfg) { mapCfg.name = $('mapName').value.trim().slice(0, 40) || 'Karte'; broadcastMap(); } };
