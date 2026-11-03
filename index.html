@@ -741,7 +741,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const has = sl && sl.files && sl.files.length;
       b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
       b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
-      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? 'fehlt · Exportordner wählen' : 'wird übertragen …') : 'Leer · Platzhalter';
+      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? (net.ready ? 'wird übertragen …' : 'fehlt · Spiel beitreten') : 'wird übertragen …') : 'Leer · Platzhalter';
       b.onclick = () => activateSlot(i);
       b.ondblclick = () => { activateSlot(i); enterPlay(); };
       list.append(b);
@@ -764,7 +764,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     renderSlots();
     const sl = slots[i];
     if (sl && sl.files && sl.files.length) loadFiles(sl.files, sl.settings, false);
-    else if (rosterSource === 'repo' && sl && sl.mk) showPlaceholder(`Fehlt noch: Exportiere ${sl.path} mit wow.export als glTF und wähle deinen Exportordner.`);
+    else if (rosterSource === 'repo' && sl && sl.mk) showPlaceholder(net.ready ? 'Wird von einem Mitspieler übertragen …' : 'Fehlt noch: Tritt dem Spiel des Spielleiters bei (Code unten), dann bekommst du den Charakter automatisch.');
     else if (rosterMode && sl && sl.mk) showPlaceholder('Charakter wird vom Spielleiter übertragen …');
     else if (rosterMode) showPlaceholder('Diesen Platz hat der Spielleiter leer gelassen.');
     else showPlaceholder('Leerer Platz. Lade einen Ordner aus wow.export oder spiel mit dem Platzhalter.');
@@ -1013,6 +1013,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       netStates.set(msg.id, msg.st); netSeen.set(msg.id, performance.now());
       if (net.host && conn) { if (!connIds.has(conn)) connIds.set(conn, new Set()); connIds.get(conn).add(msg.id); netSend(msg, conn); }
       syncPeer({ peer: msg.id, sameTab: false, kind: 'viewer', guest: false, presence: msg.st });
+      // Fehlende vorgegebene Charaktere bei Mitspielern anfragen (wer sie hat, schickt sie)
+      if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) requestModel(msg.id, sl.mk);
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
@@ -1236,7 +1238,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('fixRosterRow').hidden = true;
     $('slotFolder').textContent = 'Exportordner wählen';
     const info = $('rosterInfo'); info.hidden = false;
-    info.textContent = 'Die Charaktere sind im Spiel vorgegeben. Exportiere sie einmal mit wow.export (Format glTF) aus deiner eigenen WoW-Installation und wähle dann deinen wow.export-Ordner.';
+    info.textContent = 'Die Charaktere sind im Spiel vorgegeben. Fehlen sie dir, tritt einfach dem Spiel des Spielleiters bei: Er schickt sie dir automatisch. Oder exportiere sie selbst mit wow.export (glTF) und wähle deinen Exportordner.';
   }
 
   // Sucht im Exportordner die Modelle der Liste samt .bin und Texturen
