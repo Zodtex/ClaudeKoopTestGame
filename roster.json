@@ -42,9 +42,20 @@
     "name": "Karte",
     "key": "map:adt_32_59",
     "spawn": [
-      96.44,
-      -36.08,
-      -1.46
-    ]
+      95.48,
+      -33.46,
+      -1.72
+    ],
+    "water": {
+      "on": true,
+      "level": 37.6,
+      "block": true
+    },
+    "env": {
+      "sky": "#a8c5da",
+      "fog": 650,
+      "light": 0.75,
+      "sun": 45
+    }
   }
 }
