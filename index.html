@@ -188,6 +188,32 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 
 .drop { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(10,13,17,0.72); border: 2px dashed var(--gold); font-family: var(--f-display); font-size: 22px; letter-spacing: 0.08em; color: var(--gold); pointer-events: none; }
 
+/* Einheitenrahmen wie in WoW: oben links ich, darunter die Gruppe */
+.unitframes { top: calc(12px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.uf { position: relative; display: flex; align-items: center; }
+.uf-por { border-radius: 50%; background: #10161c; border: 3px solid #b8924a; box-shadow: 0 0 0 1px #3b2a0c, 0 3px 10px rgba(0,0,0,0.6); z-index: 2; flex: none; }
+.uf.player .uf-por { width: 72px; height: 72px; }
+.uf-lvl { position: absolute; left: 50px; top: 52px; z-index: 3; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 35%, #4b3a1a, #1a130a); border: 2px solid #b8924a; font: 600 11px var(--f-mono); color: #ffd100; }
+.uf-main { margin-left: -16px; padding: 6px 10px 7px 22px; min-width: 0; display: flex; flex-direction: column; gap: 3px; background: linear-gradient(180deg, rgba(25,28,34,0.92), rgba(12,14,18,0.92)); border: 1px solid #8e6d2f; border-radius: 0 6px 6px 0; box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 10px rgba(0,0,0,0.5); }
+.uf.player .uf-main { width: 200px; }
+.uf-name { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; min-width: 0; }
+.uf-name b { font: 600 13px var(--f-body); color: #ffd100; text-shadow: 0 1px 2px #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.uf-name small { font: 10.5px var(--f-mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.uf-bar { position: relative; height: 13px; background: #0b0d10; border: 1px solid #000; border-radius: 2px; overflow: hidden; }
+.uf-bar i { position: absolute; inset: 0 auto 0 0; width: 100%; transition: width 0.3s; }
+.uf-bar.hp i { background: linear-gradient(180deg, #3fe23f, #11a311 55%, #0b7a0b); }
+.uf-bar.mp i { background: linear-gradient(180deg, #5b8cff, #2450d4 55%, #1a3a9e); }
+.uf-bar span { position: absolute; inset: 0; display: grid; place-items: center; font: 600 10px var(--f-mono); color: #fff; text-shadow: 0 1px 1px #000, 0 0 2px #000; font-variant-numeric: tabular-nums; }
+.uf-bar.mp { height: 9px; }
+.uf-bar.mp span { font-size: 8.5px; }
+.uf-party { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.uf.member .uf-por { width: 46px; height: 46px; border-width: 2px; }
+.uf.member .uf-main { width: 150px; margin-left: -10px; padding: 4px 8px 5px 14px; }
+.uf.member .uf-name b { font-size: 12px; }
+.uf.member .uf-bar.hp { height: 11px; }
+.uf.member.away { opacity: 0.55; }
+.uf-online { font: 10.5px var(--f-mono); color: var(--parch); text-shadow: 0 1px 3px #000; opacity: 0.8; }
+.minimap .mmcoords { font: 10.5px var(--f-mono); color: var(--parch); text-shadow: 0 1px 3px #000; opacity: 0.8; margin-top: -2px; }
 .party { top: calc(66px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); min-width: 170px; max-width: min(260px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
 .party .ttl { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
 .party .ttl .dot { font-family: var(--f-mono); letter-spacing: 0; text-transform: none; }
@@ -267,6 +293,19 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
+<div class="hud unitframes" id="unitFrames" hidden>
+  <div class="uf player" id="ufPlayer">
+    <canvas class="uf-por" width="128" height="128" aria-hidden="true"></canvas>
+    <span class="uf-lvl" title="Stufe">1</span>
+    <div class="uf-main">
+      <div class="uf-name"><b></b><small></small></div>
+      <div class="uf-bar hp" role="meter" aria-label="Gesundheit"><i></i><span></span></div>
+      <div class="uf-bar mp" role="meter" aria-label="Mana"><i></i><span></span></div>
+    </div>
+  </div>
+  <div class="uf-party" id="ufParty"></div>
+  <div class="uf-online" id="ufOnline"></div>
+</div>
 <div class="hud chat" id="chat" hidden>
   <div class="chatlog" id="chatLog" aria-live="polite"></div>
   <input type="text" id="chatInput" maxlength="200" placeholder="Nachricht oder /tanzen, /winken, /e …" autocomplete="off" spellcheck="false" aria-label="Chat" hidden>
@@ -274,6 +313,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud minimap" id="minimap" hidden>
   <canvas id="mmCanvas" width="340" height="340" aria-label="Minimap"></canvas>
   <div class="mmzone" id="mmZone">Übungsfeld</div>
+  <div class="mmcoords" id="mmCoords"></div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
 <div class="hud actionbar" id="actionBar" hidden>
@@ -332,7 +372,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 01:35</p>
+<p class="ver">v 04.11. 01:55</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -966,6 +1006,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     sun.target.position.copy(player.position);
 
     $('coords').textContent = `${mapLoaded && mapCfg ? mapCfg.name + ' · ' : ''}x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
+    if (play) { const c = `${player.position.x.toFixed(0)}, ${player.position.z.toFixed(0)}${autorun ? ' · Autolauf' : ''}`; if ($('mmCoords').textContent !== c) $('mmCoords').textContent = c; updatePortraits(); }
 
     updateEnvFrame(dt);
     drawMinimap();
@@ -1349,7 +1390,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     audioStart();
-    $('selectPanel').hidden = true; $('panel').hidden = true; /* Charakterwechsel jetzt im Esc-Menü */ $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap; $('actionBar').hidden = false;
+    $('selectPanel').hidden = true; $('panel').hidden = true; /* Charakterwechsel jetzt im Esc-Menü */ $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap; $('actionBar').hidden = false; $('unitFrames').hidden = false; $('party').hidden = true; document.querySelector('.brand').hidden = true; renderUnitFrames();
     if (worldLeft) { worldLeft = false; autoJoin(); }
     renderNameBar(); renderParty();
     canvas.focus();
@@ -1359,7 +1400,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     mode = 'select'; keys.clear(); autorun = false; lmb = rmb = false;
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     resetPlayer();
-    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true; $('chat').hidden = true; $('minimap').hidden = true; $('actionBar').hidden = true; closeChat();
+    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true; $('chat').hidden = true; $('minimap').hidden = true; $('actionBar').hidden = true; $('unitFrames').hidden = true; $('party').hidden = false; document.querySelector('.brand').hidden = false; closeChat();
     renderSlots(); renderNameBar(); renderParty();
   }
 
@@ -1518,6 +1559,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
 
   function renderParty() {
+    if (typeof renderUnitFrames === 'function') renderUnitFrames();
     const box = $('party'); box.innerHTML = '';
     const head = document.createElement('div'); head.className = 'ttl';
     const others = [...netStates.entries()].map(([id, st]) => ({ peer: id, presence: st, guest: false }));
@@ -1569,7 +1611,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const me = mode === 'play'
       ? { m: 'play', n: shownName(), cn: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
-          em: emote, ld: loadPercent(),
+          em: emote, ld: loadPercent(), hp: unit.hp, hm: unit.hpMax, mp: unit.mp, mm: unit.mpMax, lv: unit.level,
           sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
           ...Object.fromEntries(ANIMS.map(a => [a.net, model ? clipName($(a.id)) : null])) }
       : { m: 'select', n: shownName(), cn: myName(), c: myHue, p: null, mk: null, ld: loadPercent() };
@@ -2586,6 +2628,71 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('volAmb').oninput = e => { vol.amb = +e.target.value; saveVol(); applyVol(); };
   $('volMute').onchange = e => { vol.mute = e.target.checked; saveVol(); applyVol(); };
   applyVol(); renderAudioAdmin();
+
+  // ---------- Einheitenrahmen (ich + Gruppe) ----------
+  // Noch ohne Kampf: Gesundheit und Mana stehen voll; die Werte gehen aber schon an die Mitspieler.
+  const unit = { hp: 100, hpMax: 100, mp: 100, mpMax: 100, level: 1 };
+  const portraitCanvases = new Map(); // 'me' bzw. Spieler-ID → Canvas
+  function setBar(el, cur, max) {
+    const pct = max > 0 ? Math.max(0, Math.min(1, cur / max)) : 0;
+    el.querySelector('i').style.width = (pct * 100) + '%';
+    el.querySelector('span').textContent = `${Math.round(cur)} / ${Math.round(max)}`;
+    el.setAttribute('aria-valuenow', Math.round(cur)); el.setAttribute('aria-valuemax', Math.round(max));
+  }
+  function renderUnitFrames() {
+    const me = $('ufPlayer');
+    me.querySelector('.uf-name b').textContent = shownName();
+    me.querySelector('.uf-name small').textContent = myName();
+    me.querySelector('.uf-lvl').textContent = unit.level;
+    setBar(me.querySelector('.hp'), unit.hp, unit.hpMax); setBar(me.querySelector('.mp'), unit.mp, unit.mpMax);
+    portraitCanvases.set('me', me.querySelector('.uf-por'));
+    const box = $('ufParty'), seen = new Set();
+    for (const [id, st] of netStates) {
+      seen.add(id);
+      let f = box.querySelector(`[data-id="${CSS.escape(id)}"]`);
+      if (!f) {
+        f = document.createElement('div'); f.className = 'uf member'; f.dataset.id = id;
+        f.innerHTML = '<canvas class="uf-por" width="96" height="96" aria-hidden="true"></canvas><div class="uf-main"><div class="uf-name"><b></b><small></small></div><div class="uf-bar hp"><i></i><span></span></div><div class="uf-bar mp"><i></i><span></span></div></div>';
+        box.append(f); portraitCanvases.set(id, f.querySelector('canvas'));
+      }
+      const num = (v, d) => Number.isFinite(v) ? v : d;
+      f.querySelector('.uf-name b').textContent = String(st.n || 'Abenteurer').slice(0, 24);
+      f.querySelector('.uf-name small').textContent = Number.isFinite(st.ld) ? `lädt ${Math.round(st.ld)} %` : st.m === 'play' ? String(st.cn || '').slice(0, 24) : 'Auswahl';
+      f.classList.toggle('away', st.m !== 'play');
+      setBar(f.querySelector('.hp'), num(st.hp, 100), num(st.hm, 100)); setBar(f.querySelector('.mp'), num(st.mp, 100), num(st.mm, 100));
+    }
+    for (const f of [...box.children]) if (!seen.has(f.dataset.id)) { portraitCanvases.delete(f.dataset.id); f.remove(); }
+    $('ufOnline').textContent = !net.peer ? 'solo' : !net.ready ? 'verbinde …' : `${netStates.size + 1} online`;
+  }
+  // Porträts: Gesicht der Figur aus der Spielwelt fotografiert, reihum alle 0,4 s eins
+  const porCam = new THREE.PerspectiveCamera(30, 1, 0.05, 60);
+  const porRT = new THREE.WebGLRenderTarget(128, 128); porRT.texture.encoding = THREE.sRGBEncoding;
+  const porBuf = new Uint8Array(128 * 128 * 4);
+  let porQueue = [], porLast = 0;
+  function shootPortrait(canvasEl, root, height, yaw, hide) {
+    const p = new THREE.Vector3(); root.getWorldPosition(p);
+    const head = p.y + height * 0.8, d = Math.max(0.9, height * 0.95);
+    porCam.position.set(p.x + Math.sin(yaw) * d, head + height * 0.06, p.z + Math.cos(yaw) * d);
+    porCam.lookAt(p.x, head - height * 0.04, p.z);
+    const was = hide.map(o => o && o.visible); hide.forEach(o => { if (o) o.visible = false; });
+    renderer.setRenderTarget(porRT); renderer.render(scene, porCam); renderer.setRenderTarget(null);
+    hide.forEach((o, i) => { if (o) o.visible = was[i]; });
+    renderer.readRenderTargetPixels(porRT, 0, 0, 128, 128, porBuf);
+    const g = canvasEl.getContext('2d'), W = canvasEl.width;
+    const img = new ImageData(128, 128);
+    for (let y = 0; y < 128; y++) img.data.set(porBuf.subarray((127 - y) * 512, (128 - y) * 512), y * 512);
+    if (W === 128) g.putImageData(img, 0, 0);
+    else { const tmp = document.createElement('canvas'); tmp.width = tmp.height = 128; tmp.getContext('2d').putImageData(img, 0, 0); g.drawImage(tmp, 0, 0, W, W); }
+  }
+  function updatePortraits() {
+    const now = performance.now(); if (now - porLast < 400) return; porLast = now;
+    if (!porQueue.length) porQueue = ['me', ...netStates.keys()];
+    const id = porQueue.shift(), cv = portraitCanvases.get(id); if (!cv) return;
+    try {
+      if (id === 'me') shootPortrait(cv, player, modelHeight, facing, [selfBubbleHolder.bubble]);
+      else { const R = remotes.get(id); if (R && R.group.visible) shootPortrait(cv, R.group, R.model ? R.h : 2, R.group.rotation.y, [R.tag, R.bubble]); }
+    } catch (e) { console.warn('Porträt', e); }
+  }
 
   // ---------- Aktionsleiste ----------
   const ICONS = {
