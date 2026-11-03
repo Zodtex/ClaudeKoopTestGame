@@ -101,6 +101,19 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .cropbox { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; }
 #cropCanvas { width: 100%; height: auto; max-height: 220px; object-fit: contain; cursor: crosshair; border-radius: 4px; touch-action: none;
   background: repeating-conic-gradient(#2a2f35 0 25%, #1c2025 0 50%) 0 0 / 16px 16px; }
+.cropscroll { overflow: auto; max-height: 220px; border-radius: 4px; }
+.cropzoom { align-items: center; }
+.cropzoom .btn { flex: 0 0 auto; padding: 6px 10px; }
+.cropzoom #cropBig { flex: 1 1 auto; }
+.cropzoom .val { font: 11px var(--f-mono); color: var(--muted); }
+.cropmodal { position: fixed; inset: 0; z-index: 45; background: rgba(8,11,15,0.7); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.cropmodalbox { width: min(1400px, 100%); max-height: 100%; overflow: auto; background: var(--night); border: 1px solid rgba(208,166,78,0.6); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.cropmodalhead { display: flex; justify-content: space-between; align-items: center; font: 600 15px var(--f-display); letter-spacing: 0.08em; color: var(--gold); }
+.cropmodalhead .btn { flex: 0 0 auto; padding: 8px 22px; }
+.cropbox.big { border: 0; padding: 0; }
+.cropbox.big .cropscroll { max-height: calc(100vh - 300px); }
+.cropbox.big #cropCanvas { max-height: none; object-fit: fill; image-rendering: pixelated; }
+.cropbox.big #cropBig { display: none; }
 .croppieces { display: flex; gap: 6px; flex-wrap: wrap; }
 .croppieces button { min-width: 32px; padding: 4px 8px; font: 600 12px var(--f-mono); border-radius: 4px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
 .croppieces button.on { border-color: var(--gold); color: var(--gold); background: rgba(208,166,78,0.12); }
@@ -277,6 +290,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <circle cx="43" cy="43" r="4" fill="#f4d88a"/>
 <circle cx="43" cy="7" r="2.5" fill="#f4d88a"/><circle cx="43" cy="79" r="2.5" fill="#f4d88a"/><circle cx="7" cy="43" r="2.5" fill="#f4d88a"/><circle cx="79" cy="43" r="2.5" fill="#f4d88a"/></svg></div>
 </div>
+<div class="cropmodal" id="cropModal" hidden role="dialog" aria-modal="true" aria-label="Ausschnitt bearbeiten">
+  <div class="cropmodalbox">
+    <div class="cropmodalhead"><span>Ausschnitt bearbeiten</span><button class="btn" id="cropDone">Fertig</button></div>
+    <div id="cropModalBody"></div>
+  </div>
+</div>
 <div class="menuov" id="menuOv" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
   <div class="menubox">
     <div class="mtitle" id="menuTitle">Spielmenü</div>
@@ -310,7 +329,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 00:55</p>
+<p class="ver">v 04.11. 01:10</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -516,7 +535,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           <label for="cropKind">Ausschnitt für</label>
           <select id="cropKind"><option value="bar">Leiste</option><option value="cap">Endkappe</option><option value="slot">Feld-Rahmen</option><option value="hl">Hover-Glanz</option></select>
         </div>
-        <canvas id="cropCanvas" width="600" height="200" aria-label="Sammeldatei – Rahmen aufziehen"></canvas>
+        <div class="cropscroll" id="cropScroll"><canvas id="cropCanvas" width="600" height="200" aria-label="Sammeldatei – Rahmen aufziehen"></canvas></div>
+        <div class="btnrow cropzoom">
+          <button class="btn" id="cropBig">Groß bearbeiten</button>
+          <button class="btn ghost" id="cropZoomOut" title="Verkleinern">−</button>
+          <button class="btn ghost" id="cropZoomFit" title="Einpassen">Einpassen</button>
+          <button class="btn ghost" id="cropZoomIn" title="Vergrößern">+</button>
+          <span class="val" id="cropZoomVal"></span>
+        </div>
         <div class="croppieces" id="cropPieces"></div>
         <div class="cropnums">
           <label>x <input type="number" id="cropX" min="0" step="1"></label>
@@ -528,7 +554,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           <button class="btn ghost" id="cropAll">Ganzes Bild</button>
           <button class="btn ghost" id="cropRetail">Retail-Leiste</button>
         </div>
-        <p class="hint" id="cropHint">Zieh mit der Maus einen Rahmen um den Teil, den du willst. Besteht die Leiste aus mehreren Stücken, mit „+" weitere Ausschnitte anlegen – sie werden nebeneinandergesetzt.</p>
+        <p class="hint" id="cropHint">Zieh mit der Maus einen Rahmen um den Teil, den du willst. Im großen Editor: Mausrad zoomt, rechte Maustaste verschiebt. Besteht die Leiste aus mehreren Stücken, mit „+" weitere Ausschnitte anlegen – sie werden nebeneinandergesetzt.</p>
       </div>
       <button class="btn ghost danger" id="uiClear">Zurück zur eigenen Leiste</button>
       <p class="hint">In wow.export im Tab „Textures" nach „mainmenubar" suchen (z. B. die Endkappe mit dem Greif) und als PNG exportieren. Die linke Kappe wird rechts automatisch gespiegelt. Für die Felder unter „buttons" z. B. „ui-quickslot2" (Rahmen) und „buttonhilight-square" (Glanz). In WoW ist der Rahmen größer als das Feld – mit „Rahmengröße" anpassen. Die Grafiken gehen wie Modelle nur an deine Mitspieler, nicht auf GitHub.</p>
@@ -2683,8 +2709,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const f = await sharedGet(key); if (!f || !f[0]) return;
       edBmp = await createImageBitmap(f[0]); edBmpKey = key;
     }
-    $('cropHint').textContent = `Bild ${edBmp.width} × ${edBmp.height} px. Rahmen mit der Maus aufziehen; mit „+" weitere Stücke nebeneinandersetzen.`;
-    cv.width = edBmp.width; cv.height = edBmp.height;
+    $('cropHint').textContent = `Bild ${edBmp.width} × ${edBmp.height} px. Linke Maus: Rahmen aufziehen · Mausrad: Zoom (groß) · rechte Maus: verschieben · „+": weiteres Stück.`;
+    if (cv.width !== edBmp.width || cv.height !== edBmp.height) { cv.width = edBmp.width; cv.height = edBmp.height; requestAnimationFrame(() => typeof applyCropZoom === 'function' && applyCropZoom()); }
     g.clearRect(0, 0, cv.width, cv.height); g.drawImage(edBmp, 0, 0);
     const crops = cropsOf(edKind), lw = Math.max(1, edBmp.width / 300);
     crops.forEach((r, i) => {
@@ -2709,17 +2735,21 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const sc = Math.min(rc.width / cv.width, rc.height / cv.height), ox = (rc.width - cv.width * sc) / 2, oy = (rc.height - cv.height * sc) / 2;
     return [Math.max(0, Math.min(cv.width, (e.clientX - rc.left - ox) / sc)), Math.max(0, Math.min(cv.height, (e.clientY - rc.top - oy) / sc))];
   }
+  let edPan = null;
+  $('cropCanvas').addEventListener('contextmenu', e => e.preventDefault());
   $('cropCanvas').addEventListener('pointerdown', e => {
     if (!edBmp) return; e.preventDefault(); $('cropCanvas').setPointerCapture(e.pointerId);
+    if (e.button === 2 || e.button === 1) { const sc = $('cropScroll'); edPan = [e.clientX, e.clientY, sc.scrollLeft, sc.scrollTop]; return; } // rechte/mittlere Maustaste: verschieben
     edDrag = canvasPt(e);
   });
   $('cropCanvas').addEventListener('pointermove', e => {
+    if (edPan) { const sc = $('cropScroll'); sc.scrollLeft = edPan[2] - (e.clientX - edPan[0]); sc.scrollTop = edPan[3] - (e.clientY - edPan[1]); return; }
     if (!edDrag) return;
     const [x, y] = canvasPt(e), r = [Math.round(Math.min(x, edDrag[0])), Math.round(Math.min(y, edDrag[1])), Math.max(1, Math.round(Math.abs(x - edDrag[0]))), Math.max(1, Math.round(Math.abs(y - edDrag[1])))];
     const l = cropsOf(edKind).slice(); if (!l.length) edPiece = 0; l[edPiece] = r;
     uiCfg.crop = uiCfg.crop || {}; uiCfg.crop[edKind] = l; renderCropEditor();
   });
-  const endDrag = () => { if (edDrag) { edDrag = null; uiChanged(); } };
+  const endDrag = () => { edPan = null; if (edDrag) { edDrag = null; uiChanged(); } };
   $('cropCanvas').addEventListener('pointerup', endDrag); $('cropCanvas').addEventListener('pointercancel', endDrag);
   ['cropX', 'cropY', 'cropW', 'cropH'].forEach((id, i) => $(id).onchange = e => {
     const l = cropsOf(edKind).slice(); const r = (l[edPiece] || [0, 0, edBmp ? edBmp.width : 1, edBmp ? edBmp.height : 1]).slice();
@@ -2730,6 +2760,31 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   // Ausschnitt der Retail-Sammeldatei „mainmenubar" (1024 × 256) laut Blizzard-Forum; ggf. anpassen
   $('cropRetail').onclick = () => { edPiece = 0; setCrops([[114, 116, 804, 48]]); };
   renderCropEditor();
+  // Großer Editor mit Zoom
+  let cropZoom = 0; // 0 = einpassen
+  const cropHome = $('cropBox').parentElement, cropNext = $('cropBox').nextElementSibling;
+  function applyCropZoom() {
+    const cv = $('cropCanvas'), big = $('cropBox').classList.contains('big');
+    if (!big || !edBmp) { cv.style.width = ''; cv.style.height = ''; $('cropZoomVal').textContent = ''; return; }
+    const fit = Math.max(0.1, ($('cropScroll').clientWidth - 4) / edBmp.width);
+    const z = cropZoom || fit;
+    cv.style.width = Math.round(edBmp.width * z) + 'px'; cv.style.height = Math.round(edBmp.height * z) + 'px';
+    $('cropZoomVal').textContent = Math.round(z * 100) + ' %';
+  }
+  function zoomBy(f) { const fit = ($('cropScroll').clientWidth - 4) / (edBmp ? edBmp.width : 1); cropZoom = Math.max(0.1, Math.min(16, (cropZoom || fit) * f)); applyCropZoom(); }
+  $('cropBig').onclick = () => {
+    $('cropModalBody').append($('cropBox')); $('cropBox').classList.add('big'); $('cropModal').hidden = false; cropZoom = 0;
+    requestAnimationFrame(applyCropZoom);
+  };
+  $('cropDone').onclick = () => {
+    $('cropBox').classList.remove('big'); cropHome.insertBefore($('cropBox'), cropNext); $('cropModal').hidden = true; applyCropZoom();
+  };
+  $('cropZoomIn').onclick = () => zoomBy(1.5);
+  $('cropZoomOut').onclick = () => zoomBy(1 / 1.5);
+  $('cropZoomFit').onclick = () => { cropZoom = 0; applyCropZoom(); };
+  $('cropScroll').addEventListener('wheel', e => { if (!$('cropBox').classList.contains('big')) return; e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2); }, { passive: false });
+  $('cropModal').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); $('cropDone').click(); } });
+  addEventListener('resize', applyCropZoom);
   $('uiSlotPick').onclick = () => $('uiSlotInput').click();
   $('uiHlPick').onclick = () => $('uiHlInput').click();
   $('uiSlotInput').onchange = e => { pickUi('slot', e.target.files); e.target.value = ''; };
