@@ -222,6 +222,23 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 #unitFrames.wowsb .uf-bar i { background-image: var(--sb-img); background-size: 100% 100%; background-blend-mode: multiply; }
 #unitFrames.wowsb .uf-bar.hp i { background-color: #1bd51b; }
 #unitFrames.wowsb .uf-bar.mp i { background-color: #2a5cff; }
+/* Inhalt an die Grafik angepasst: Rahmen hat die Größe der Grafik, Elemente sitzen an festen Stellen darin */
+.uf.art { display: block; flex: none; }
+#ufPlayer.art { width: var(--pf-w); height: calc(var(--pf-w) * var(--pf-ar)); transform: translate(var(--pf-x), var(--pf-y)); }
+.uf.member.art { width: var(--pa-w); height: calc(var(--pa-w) * var(--pa-ar)); transform: translate(var(--pa-x), var(--pa-y)); }
+#unitFrames.wowpf #ufPlayer.art::after, #unitFrames.wowpa .uf.member.art::after { left: 0; top: 0; width: 100%; height: 100%; }
+.uf.art .uf-main { display: contents; }
+.uf.art [data-el] { position: absolute; margin: 0; box-sizing: border-box; }
+.uf.art .uf-por { border: 0; box-shadow: none; z-index: 1; }
+.uf.art .uf-bar { z-index: 1; border: 0; border-radius: 0; background: rgba(0,0,0,0.55); }
+.uf.art .uf-bar span { font-size: var(--fs, 10px); }
+.uf.art .uf-name { z-index: 5; justify-content: center; align-items: center; display: flex; }
+.uf.art .uf-name b { font-size: var(--fs, 12px); }
+.uf.art .uf-name small { display: none; }
+.uf.art .uf-lvl { z-index: 5; background: none; border: 0; font-size: var(--fs, 11px); display: grid; place-items: center; }
+#unitFrames.eledit { pointer-events: auto; }
+#unitFrames.eledit .uf.art [data-el] { cursor: move; outline: 1px dashed rgba(255,211,77,0.9); outline-offset: -1px; }
+#unitFrames.eledit .uf.art [data-el].sel { outline: 2px solid #ffd34d; }
 .uf-online { font: 10.5px var(--f-mono); color: var(--parch); text-shadow: 0 1px 3px #000; opacity: 0.8; }
 .minimap .mmcoords { font: 10.5px var(--f-mono); color: var(--parch); text-shadow: 0 1px 3px #000; opacity: 0.8; margin-top: -2px; }
 .party { top: calc(66px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); min-width: 170px; max-width: min(260px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
@@ -305,12 +322,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud party" id="party" aria-live="polite"></div>
 <div class="hud unitframes" id="unitFrames" hidden>
   <div class="uf player" id="ufPlayer">
-    <canvas class="uf-por" width="128" height="128" aria-hidden="true"></canvas>
-    <span class="uf-lvl" title="Stufe">1</span>
+    <canvas class="uf-por" data-el="por" width="128" height="128" aria-hidden="true"></canvas>
+    <span class="uf-lvl" data-el="lvl" title="Stufe">1</span>
     <div class="uf-main">
-      <div class="uf-name"><b></b><small></small></div>
-      <div class="uf-bar hp" role="meter" aria-label="Gesundheit"><i></i><span></span></div>
-      <div class="uf-bar mp" role="meter" aria-label="Mana"><i></i><span></span></div>
+      <div class="uf-name" data-el="name"><b></b><small></small></div>
+      <div class="uf-bar hp" data-el="hp" role="meter" aria-label="Gesundheit"><i></i><span></span></div>
+      <div class="uf-bar mp" data-el="mp" role="meter" aria-label="Mana"><i></i><span></span></div>
     </div>
   </div>
   <div class="uf-party" id="ufParty"></div>
@@ -382,7 +399,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 02:20</p>
+<p class="ver">v 04.11. 02:50</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -641,6 +658,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <div class="field"><label for="ufY">Hoch/Runter</label><div><input type="range" id="ufY" min="-300" max="300" step="1" value="0"><span class="val" id="ufYVal">0 px</span></div></div>
       <div class="field"><label for="ufW">Breite</label><div><input type="range" id="ufW" min="40" max="800" step="1" value="232"><span class="val" id="ufWVal">232 px</span></div></div>
       <label class="check"><input type="checkbox" id="ufF"> Spiegeln (in WoW ist der Spielerrahmen gespiegelt)</label>
+      <span class="lbl" style="margin-top:6px">Inhalt in der Grafik</span>
+      <div class="btnrow">
+        <button class="btn ghost" id="ufPreset">Klassik-Vorlage</button>
+        <button class="btn ghost" id="ufElReset">Elemente zurücksetzen</button>
+      </div>
+      <div class="field"><label for="ufEl">Element</label><select id="ufEl"><option value="por">Porträt</option><option value="name">Name</option><option value="hp">Gesundheit</option><option value="mp">Mana</option><option value="lvl">Stufe</option></select></div>
+      <div class="cropnums">
+        <label>x <input type="number" id="ufElX" step="0.5"></label>
+        <label>y <input type="number" id="ufElY" step="0.5"></label>
+        <label>B <input type="number" id="ufElW" step="0.5" min="1"></label>
+        <label>H <input type="number" id="ufElH" step="0.5" min="1"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="ufElDrag"> Elemente im Spiel mit der Maus verschieben</label>
+      <p class="hint">Werte in Pixeln der Grafik. Beim Verschieben: ziehen = Position, Mausrad = Breite, Shift + Mausrad = Höhe. „Klassik-Vorlage" setzt Ausschnitt, Spiegelung und die Positionen aus dem WoW-Classic-Layout.</p>
       <div class="netstate" id="ufState">Eigene Rahmen.</div>
       <button class="btn ghost danger" id="ufClear">Zurück zu eigenen Rahmen</button>
       <p class="hint">In wow.export (Tab „Textures"), Classic z. B.: „targetingframe/ui-targetingframe" (Spielerrahmen, gespiegelt), „partyframe/ui-partyframe" (Gruppe), „targetingframe/ui-statusbar" (Leisten – wird grün bzw. blau eingefärbt). Danach die Grafik mit den Reglern über Porträt und Leisten schieben; Sammelbilder im Ausschnitt-Editor zuschneiden. Am besten im Spiel anpassen, damit du die Rahmen siehst.</p>
@@ -2681,7 +2712,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       let f = box.querySelector(`[data-id="${CSS.escape(id)}"]`);
       if (!f) {
         f = document.createElement('div'); f.className = 'uf member'; f.dataset.id = id;
-        f.innerHTML = '<canvas class="uf-por" width="96" height="96" aria-hidden="true"></canvas><div class="uf-main"><div class="uf-name"><b></b><small></small></div><div class="uf-bar hp"><i></i><span></span></div><div class="uf-bar mp"><i></i><span></span></div></div>';
+        f.innerHTML = '<canvas class="uf-por" data-el="por" width="96" height="96" aria-hidden="true"></canvas><div class="uf-main"><div class="uf-name" data-el="name"><b></b><small></small></div><div class="uf-bar hp" data-el="hp"><i></i><span></span></div><div class="uf-bar mp" data-el="mp"><i></i><span></span></div></div>';
         box.append(f); portraitCanvases.set(id, f.querySelector('canvas'));
       }
       const num = (v, d) => Number.isFinite(v) ? v : d;
@@ -2691,6 +2722,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       setBar(f.querySelector('.hp'), num(st.hp, 100), num(st.hm, 100)); setBar(f.querySelector('.mp'), num(st.mp, 100), num(st.mm, 100));
     }
     for (const f of [...box.children]) if (!seen.has(f.dataset.id)) { portraitCanvases.delete(f.dataset.id); f.remove(); }
+    if (typeof layoutFrames === 'function') layoutFrames();
     $('ufOnline').textContent = !net.peer ? 'solo' : !net.ready ? 'verbinde …' : `${netStates.size + 1} online`;
   }
   // Porträts: Gesicht der Figur aus der Spielwelt fotografiert, reihum alle 0,4 s eins
@@ -2788,6 +2820,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     }
     const n = (v, lo, hi) => Number.isFinite(+v) && v !== null && v !== '' ? Math.max(lo, Math.min(hi, Math.round(+v))) : null;
     o.capS = n(u.capS, 40, 240); o.capX = n(u.capX, -140, 80); o.capY = n(u.capY, -80, 120);
+    for (const f of ['pf', 'pa']) {
+      const L = u[f + 'L']; if (L && typeof L === 'object') { o[f + 'L'] = {}; for (const el of ['por', 'name', 'hp', 'mp', 'lvl']) if (Array.isArray(L[el]) && L[el].length === 4 && L[el].every(v => Number.isFinite(v) && Math.abs(v) < 4096)) o[f + 'L'][el] = L[el].map(v => Math.round(v * 10) / 10); }
+    }
     for (const f of ['pf', 'pa']) { o[f + 'X'] = n(u[f + 'X'], -300, 300); o[f + 'Y'] = n(u[f + 'Y'], -300, 300); o[f + 'W'] = n(u[f + 'W'], 40, 800); o[f + 'F'] = !!u[f + 'F']; }
     return o.cap || o.bar || o.slot || o.hl || o.pf || o.pa || o.sb || o.capS !== null || o.capX !== null || o.capY !== null ? o : null;
   };
@@ -2829,9 +2864,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         const u = await imageUrl(file, cropsOf(kind));
         const im = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = u; });
         uf.style.setProperty(`--${kind}-img`, `url("${u}")`);
-        if (im && im.naturalWidth) uf.style.setProperty(`--${kind}-ar`, im.naturalHeight / im.naturalWidth);
+        if (im && im.naturalWidth) { uf.style.setProperty(`--${kind}-ar`, im.naturalHeight / im.naturalWidth); artSize[kind] = { w: im.naturalWidth, h: im.naturalHeight }; }
         uf.classList.add(cls);
-      } else { uf.style.removeProperty(`--${kind}-img`); uf.classList.remove(cls); }
+      } else { uf.style.removeProperty(`--${kind}-img`); uf.classList.remove(cls); artSize[kind] = null; }
     }
     if (fsb) { uf.style.setProperty('--sb-img', `url("${await imageUrl(fsb, cropsOf('sb'))}")`); uf.classList.add('wowsb'); }
     else { uf.style.removeProperty('--sb-img'); uf.classList.remove('wowsb'); }
@@ -2927,12 +2962,97 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('ufY').value = g('Y'); $('ufYVal').textContent = g('Y') + ' px';
     $('ufW').value = g('W'); $('ufWVal').textContent = g('W') + ' px';
     $('ufF').checked = !!(uiCfg && uiCfg[ufWhich + 'F']);
+    layoutFrames();
   }
   function setFrame(patch) {
     uiCfg = Object.assign({ cap: null, bar: null, slot: null, hl: null, pf: null, pa: null, sb: null, ss: 1.8, crop: {} }, uiCfg, patch);
     applyFramePos();
     clearTimeout(uiSendTimer); uiSendTimer = setTimeout(() => { if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg }); }, 300);
   }
+  // Elemente in der Grafik: Positionen in Grafik-Pixeln. Vorgaben aus dem WoW-Classic-Layout
+  // (Spielerrahmen 232 × 100, Gruppenrahmen 128 × 53), auf die tatsächliche Grafikgröße umgerechnet.
+  const artSize = { pf: null, pa: null };
+  const CLASSIC = {
+    pf: { base: [232, 100], L: { por: [42, 12, 64, 64], name: [106, 22, 119, 14], hp: [106, 41, 119, 12], mp: [106, 52, 119, 12], lvl: [41, 59, 24, 16] } },
+    pa: { base: [128, 53], L: { por: [7, 6, 37, 37], name: [47, 0, 75, 11], hp: [47, 12, 70, 7], mp: [47, 19, 70, 7], lvl: [0, 0, 0, 0] } },
+  };
+  let ufEl = 'por', elDrag = null;
+  function layoutOf(kind) {
+    const a = artSize[kind]; if (!a) return null;
+    const C = CLASSIC[kind], sx = a.w / C.base[0], sy = a.h / C.base[1], own = uiCfg && uiCfg[kind + 'L'] || {};
+    const out = {};
+    for (const el of Object.keys(C.L)) out[el] = own[el] || [C.L[el][0] * sx, C.L[el][1] * sy, C.L[el][2] * sx, C.L[el][3] * sy];
+    return out;
+  }
+  function placeEls(frame, kind) {
+    const L = layoutOf(kind), a = artSize[kind];
+    frame.classList.toggle('art', !!L);
+    frame.querySelectorAll('[data-el]').forEach(el => {
+      if (!L) { el.style.left = el.style.top = el.style.width = el.style.height = ''; el.style.removeProperty('--fs'); el.hidden = false; return; }
+      const r = L[el.dataset.el]; if (!r) return;
+      el.hidden = r[2] <= 0 || r[3] <= 0;
+      el.style.left = (r[0] / a.w * 100) + '%'; el.style.top = (r[1] / a.h * 100) + '%';
+      el.style.width = (r[2] / a.w * 100) + '%'; el.style.height = (r[3] / a.h * 100) + '%';
+      // Schrift nach Elementhöhe (angezeigte Pixel)
+      const W = parseFloat(getComputedStyle($('unitFrames')).getPropertyValue(`--${kind}-w`)) || a.w;
+      el.style.setProperty('--fs', Math.max(7, r[3] / a.h * W * (a.h / a.w) * (el.dataset.el === 'name' ? 0.85 : 0.75)) + 'px');
+    });
+  }
+  function layoutFrames() {
+    const uf = $('unitFrames');
+    placeEls($('ufPlayer'), uf.classList.contains('wowpf') ? 'pf' : '_');
+    document.querySelectorAll('#ufParty .uf.member').forEach(f => placeEls(f, uf.classList.contains('wowpa') ? 'pa' : '_'));
+    renderElInputs();
+  }
+  function renderElInputs() {
+    const L = layoutOf(ufWhich), r = L && L[ufEl];
+    ['ufElX', 'ufElY', 'ufElW', 'ufElH'].forEach((id, i) => { $(id).disabled = !r; if (document.activeElement !== $(id)) $(id).value = r ? Math.round(r[i] * 10) / 10 : ''; });
+    document.querySelectorAll('#unitFrames [data-el]').forEach(el => el.classList.toggle('sel', el.dataset.el === ufEl && el.closest('.uf') && ((ufWhich === 'pf') === (el.closest('.uf').id === 'ufPlayer'))));
+  }
+  function setEl(kind, el, r) {
+    const L = Object.assign({}, uiCfg && uiCfg[kind + 'L']); L[el] = r.map(v => Math.round(v * 10) / 10);
+    setFrame({ [kind + 'L']: L });
+  }
+  ['ufElX', 'ufElY', 'ufElW', 'ufElH'].forEach((id, i) => $(id).onchange = e => {
+    const L = layoutOf(ufWhich); if (!L) return;
+    const r = L[ufEl].slice(); r[i] = +e.target.value || 0; setEl(ufWhich, ufEl, r);
+  });
+  $('ufEl').onchange = e => { ufEl = e.target.value; renderElInputs(); };
+  $('ufElReset').onclick = () => setFrame({ [ufWhich + 'L']: null });
+  $('ufPreset').onclick = () => {
+    if (!uiCfg || !uiCfg[ufWhich]) { $('ufState').textContent = 'Erst die Grafik für diesen Rahmen wählen.'; return; }
+    uiCfg.crop = uiCfg.crop || {};
+    if (ufWhich === 'pf') { uiCfg.crop.pf = [[24, 0, 232, 100]]; setFrame({ pfF: true, pfL: null, pfW: 232, pfX: -12, pfY: -10 }); }
+    else { uiCfg.crop.pa = [[0, 0, 128, 53]]; setFrame({ paF: false, paL: null, paW: 160, paX: 0, paY: 0 }); }
+    applyUi();
+  };
+  $('ufElDrag').onchange = e => { $('unitFrames').classList.toggle('eledit', e.target.checked); if (e.target.checked) $('adminPanel').hidden = true; };
+  // Ziehen im Spiel
+  $('unitFrames').addEventListener('pointerdown', e => {
+    if (!$('unitFrames').classList.contains('eledit')) return;
+    const el = e.target.closest('[data-el]'), fr = el && el.closest('.uf.art'); if (!el || !fr) return;
+    e.preventDefault(); el.setPointerCapture(e.pointerId);
+    const kind = fr.id === 'ufPlayer' ? 'pf' : 'pa', L = layoutOf(kind); if (!L) return;
+    ufWhich = kind; ufEl = el.dataset.el; $('ufEl').value = ufEl; $('ufWhich').value = kind;
+    const rc = fr.getBoundingClientRect(), a = artSize[kind];
+    elDrag = { kind, el: ufEl, x0: e.clientX, y0: e.clientY, r0: L[ufEl].slice(), kx: a.w / rc.width, ky: a.h / rc.height };
+    renderElInputs();
+  });
+  $('unitFrames').addEventListener('pointermove', e => {
+    if (!elDrag) return;
+    const r = elDrag.r0.slice(); r[0] += (e.clientX - elDrag.x0) * elDrag.kx; r[1] += (e.clientY - elDrag.y0) * elDrag.ky;
+    setEl(elDrag.kind, elDrag.el, r);
+  });
+  const elUp = () => { elDrag = null; };
+  $('unitFrames').addEventListener('pointerup', elUp); $('unitFrames').addEventListener('pointercancel', elUp);
+  $('unitFrames').addEventListener('wheel', e => {
+    if (!$('unitFrames').classList.contains('eledit')) return;
+    const el = e.target.closest('[data-el]'), fr = el && el.closest('.uf.art'); if (!el || !fr) return;
+    e.preventDefault();
+    const kind = fr.id === 'ufPlayer' ? 'pf' : 'pa', L = layoutOf(kind); const r = L[el.dataset.el].slice(), d = e.deltaY < 0 ? 1 : -1;
+    if (e.shiftKey) r[3] = Math.max(1, r[3] + d); else { r[2] = Math.max(1, r[2] + d); if (el.dataset.el === 'por') r[3] = r[2]; }
+    ufWhich = kind; ufEl = el.dataset.el; setEl(kind, ufEl, r);
+  }, { passive: false });
   $('ufWhich').onchange = e => { ufWhich = e.target.value; applyFramePos(); };
   $('ufX').oninput = e => setFrame({ [ufWhich + 'X']: +e.target.value });
   $('ufY').oninput = e => setFrame({ [ufWhich + 'Y']: +e.target.value });
