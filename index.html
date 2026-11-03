@@ -84,6 +84,12 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .ab-slot .hk { position: absolute; top: 2px; right: 4px; font: 600 11px var(--f-mono); color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
 .ab-slot .cd { position: absolute; inset: 0; pointer-events: none; }
 .ab-slot.empty { cursor: default; background: radial-gradient(circle at 50% 38%, #2f2c28, #151412 75%); }
+.ab-cap img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: block; }
+.actionbar.wowui .ab-cap { width: 128px; height: 128px; margin-bottom: 0; }
+.actionbar.wowui .ab-cap.left { margin-right: -18px; }
+.actionbar.wowui .ab-cap.right { margin-left: -18px; }
+.actionbar.wowbar .ab-frame { background: var(--bar-img) center / 100% 100% no-repeat; border: 0; box-shadow: none; }
+.actionbar.wowbar .ab-frame::before { display: none; }
 .ab-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(10,12,22,0.94); border: 1px solid #9a8a5a; border-radius: 4px; padding: 6px 10px; font-size: 12.5px; color: #fff; pointer-events: none; }
 .ab-tip b { display: block; color: #ffd100; font-weight: 600; margin-bottom: 2px; }
 @media (max-width: 640px) {
@@ -287,7 +293,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 00:05</p>
+<p class="ver">v 04.11. 00:20</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -468,6 +474,18 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       </div>
       <button class="btn ghost" id="waterHere">Auf meine Höhe setzen</button>
       <p class="hint">Stell dich ans Ufer und klick „Auf meine Höhe setzen". Wo das Wasser tiefer ist als die Figur, wird geschwommen – außer „Nicht schwimmen" ist an, dann ist dort eine unsichtbare Grenze. Im flachen Wasser kann man trotzdem waten.</p>
+    </div>
+    <div class="asec">
+      <span class="lbl">Aktionsleiste</span>
+      <div class="btnrow">
+        <button class="btn ghost" id="uiCapPick">Endkappe wählen</button>
+        <button class="btn ghost" id="uiBarPick">Leiste wählen</button>
+      </div>
+      <input type="file" id="uiCapInput" accept=".png,.jpg,.jpeg,image/*" hidden>
+      <input type="file" id="uiBarInput" accept=".png,.jpg,.jpeg,image/*" hidden>
+      <div class="netstate" id="uiState">Eigene Zierleiste.</div>
+      <button class="btn ghost danger" id="uiClear">Zurück zur eigenen Leiste</button>
+      <p class="hint">In wow.export im Tab „Textures" nach „mainmenubar" suchen (z. B. die Endkappe mit dem Greif) und als PNG exportieren. Die linke Kappe wird rechts automatisch gespiegelt. Die Grafiken gehen wie Modelle nur an deine Mitspieler, nicht auf GitHub.</p>
     </div>
     <div class="asec">
       <span class="lbl">Musik &amp; Klang</span>
@@ -1518,12 +1536,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) { waitFor(sl.mk); requestModel(msg.id, sl.mk); }
       if (mapCfg && !mapLoaded && !mapLoading) { waitFor(mapCfg.key); requestModel(msg.id, mapCfg.key); }
       if (mapCfg && mapCfg.audio) for (const k of [mapCfg.audio.music, mapCfg.audio.amb]) if (k && !audioHave.has(k)) requestModel(msg.id, k);
+      if (uiCfg) for (const k of [uiCfg.cap, uiCfg.bar]) if (k && !uiHave.has(k)) requestModel(msg.id, k);
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c || prev.ld !== msg.st.ld || prev.cn !== msg.st.cn) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
     } else if (msg.t === 'chat') {
       if (net.host && conn) netSend(msg, conn); // Gastgeber verteilt an alle
       receiveChat(msg);
+    } else if (msg.t === 'ui') {
+      if (net.host && conn) netSend(msg, conn);
+      setUiCfg(msg.ui, msg.id);
     } else if (msg.t === 'map') {
       if (net.host && conn) netSend(msg, conn); // Gastgeber verteilt Admin-Änderungen
       setMapCfg(msg.map, msg.id);
@@ -1593,7 +1615,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (inc.files[m.i]) return;
     inc.size += m.buf.byteLength; if (inc.size > limitFor(m.mk)) { incoming.delete(m.mk); endTask(m.mk); return; }
     const tot = Number.isFinite(m.tot) && m.tot > 0 ? m.tot : 0;
-    if (m.mk.startsWith('audio:')) status(`Musik wird übertragen … ${inc.got + 1}/${inc.n}`);
+    if (m.mk.startsWith('audio:') || m.mk.startsWith('ui:')) status(`Wird übertragen … ${inc.got + 1}/${inc.n}`);
     else setTask(m.mk, `${labelFor(m.mk)} wird übertragen`, tot ? inc.size : inc.got + 1, tot || inc.n, tot ? `${(inc.size / 1048576).toFixed(1)} / ${(tot / 1048576).toFixed(1)} MB` : `${inc.got + 1} / ${inc.n} Dateien`);
     clearTimeout(inc.stall); inc.stall = setTimeout(() => { if (incoming.get(m.mk) === inc) { incoming.delete(m.mk); endTask(m.mk); } }, 30000);
     inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
@@ -1602,6 +1624,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     sharedPut(m.mk, inc.files);
     status(`${m.mk} empfangen und gespeichert.`, 'ok');
     if (m.mk.startsWith('audio:')) { audioHave.add(m.mk); setupAudio(); }
+    if (m.mk.startsWith('ui:')) { uiHave.add(m.mk); applyUi(); }
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
     if (mapCfg && m.mk === mapCfg.key && !mapLoaded) loadMap(inc.files);
     if (rosterMode) {
@@ -1666,14 +1689,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       net.conns.add(conn); net.ready = true; lastSent = '';
       if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() });
         if (isAdmin && rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings });
-        if (isAdmin) conn.send({ t: 'map', id: net.id, map: mapCfg }); } // Neuankömmling bekommt alle bekannten Stände
+        if (isAdmin) { conn.send({ t: 'map', id: net.id, map: mapCfg }); conn.send({ t: 'ui', id: net.id, ui: uiCfg }); } } // Neuankömmling bekommt alle bekannten Stände
       else {
         clearTimeout(net.joinTimer);
         netMsg('Mit der Welt verbunden.', 'ok');
         if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); }
         if (isAdmin) { // Admin als Gast: aktuelle Einstellungen über den Gastgeber an alle
           for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings });
-          conn.send({ t: 'map', id: net.id, map: mapCfg });
+          conn.send({ t: 'map', id: net.id, map: mapCfg }); conn.send({ t: 'ui', id: net.id, ui: uiCfg });
         }
       }
       if (net.host) netMsg(`Welt offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
@@ -1798,6 +1821,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const r = await fetch('roster.json', { cache: 'no-cache' });
       if (!r.ok) return null;
       const j = await r.json();
+      repoUi = j.ui || null;
       repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40), spawn: j.map.spawn, water: j.map.water, env: j.map.env, audio: j.map.audio } : null;
       const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
       return list;
@@ -2524,6 +2548,49 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   buildActionBar();
 
+  // ---------- Grafiken für die Aktionsleiste (aus wow.export, nur unter Mitspielern geteilt) ----------
+  let uiCfg = null, repoUi = null, uiUrls = [];
+  const uiHave = new Set();
+  const capSvg = { L: document.querySelector('.ab-cap.left').innerHTML, R: document.querySelector('.ab-cap.right').innerHTML };
+  const cleanUi = u => {
+    if (!u || typeof u !== 'object') return null;
+    const k = v => typeof v === 'string' && v.startsWith('ui:') ? v.slice(0, 220) : null;
+    const o = { cap: k(u.cap), bar: k(u.bar) };
+    return o.cap || o.bar ? o : null;
+  };
+  function setUiCfg(u, fromPeer) { uiCfg = cleanUi(u); applyUi(); }
+  async function applyUi() {
+    uiUrls.forEach(URL.revokeObjectURL); uiUrls = [];
+    const bar = $('actionBar'), L = document.querySelector('.ab-cap.left'), R = document.querySelector('.ab-cap.right');
+    const fc = uiCfg && uiCfg.cap ? await sharedGet(uiCfg.cap) : null, fb = uiCfg && uiCfg.bar ? await sharedGet(uiCfg.bar) : null;
+    if (fc) uiHave.add(uiCfg.cap); if (fb) uiHave.add(uiCfg.bar);
+    if (fc && fc[0]) {
+      const u = URL.createObjectURL(fc[0]); uiUrls.push(u);
+      L.innerHTML = R.innerHTML = ''; [L, R].forEach(el => { const i = new Image(); i.src = u; i.alt = ''; el.append(i); });
+      bar.classList.add('wowui');
+    } else { L.innerHTML = capSvg.L; R.innerHTML = capSvg.R; bar.classList.remove('wowui'); }
+    if (fb && fb[0]) {
+      const u = URL.createObjectURL(fb[0]); uiUrls.push(u);
+      bar.style.setProperty('--bar-img', `url("${u}")`); bar.classList.add('wowbar');
+    } else { bar.style.removeProperty('--bar-img'); bar.classList.remove('wowbar'); }
+    const st = $('uiState');
+    st.textContent = !uiCfg ? 'Eigene Zierleiste.' : `${uiCfg.cap ? (fc ? 'Endkappe aktiv' : 'Endkappe wird übertragen …') : 'Eigene Endkappe'} · ${uiCfg.bar ? (fb ? 'Leiste aktiv' : 'Leiste wird übertragen …') : 'eigene Leiste'}`;
+    st.className = 'netstate' + (uiCfg ? ' ok' : '');
+  }
+  async function pickUi(kind, list) {
+    const f = [...list].find(x => /\.(png|jpe?g)$/i.test(x.name)); if (!f || !isAdmin) return;
+    const key = `ui:${kind}:${base(f.name)}:${f.size}`;
+    sharedPut(key, [f]); uiHave.add(key);
+    uiCfg = Object.assign({ cap: null, bar: null }, uiCfg, { [kind]: key });
+    await applyUi();
+    if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg });
+  }
+  $('uiCapPick').onclick = () => $('uiCapInput').click();
+  $('uiBarPick').onclick = () => $('uiBarInput').click();
+  $('uiCapInput').onchange = e => { pickUi('cap', e.target.files); e.target.value = ''; };
+  $('uiBarInput').onchange = e => { pickUi('bar', e.target.files); e.target.value = ''; };
+  $('uiClear').onclick = () => { uiCfg = null; applyUi(); if (net.ready) netSend({ t: 'ui', id: net.id, ui: null }); };
+
   // ---------- Spielmenü & Einstellungen ----------
   let menuOpen = false, worldLeft = false;
   const settings = { mouse: 1, invert: false, minimap: true, keys: true, names: true };
@@ -2933,6 +3000,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (mapCfg.env) out.map.env = mapCfg.env;
       if (mapCfg.audio) out.map.audio = mapCfg.audio;
     }
+    if (uiCfg) out.ui = uiCfg;
     return JSON.stringify(out, null, 2);
   }
   function showAdmin() {
@@ -3008,6 +3076,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     repoRoster = (await fetchRoster()) || [];
     await enterRepoRoster(repoRoster); // Charaktere legt nur der Admin fest
     if (repoMap) setMapCfg(repoMap, null);
+    if (repoUi) setUiCfg(repoUi, null);
     const first = slots.findIndex(sl => sl && sl.files && sl.files.length);
     enterSelect();
     activateSlot(first >= 0 ? first : 0);
