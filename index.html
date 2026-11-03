@@ -139,7 +139,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 19:30</p>
+<p class="ver">v 03.11. 19:45</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -298,12 +298,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="asec">
       <span class="lbl">Wasser</span>
       <label class="check"><input type="checkbox" id="waterOn"> Wasser anzeigen</label>
+      <label class="check"><input type="checkbox" id="waterBlock"> Nicht schwimmen (unsichtbare Grenze am tiefen Wasser)</label>
       <div class="field">
         <label for="waterLevel">Höhe</label>
         <div><input type="range" id="waterLevel" min="-20" max="200" step="0.1" value="0"><span class="val" id="waterVal">0.0</span></div>
       </div>
       <button class="btn ghost" id="waterHere">Auf meine Höhe setzen</button>
-      <p class="hint">Stell dich ans Ufer und klick „Auf meine Höhe setzen". Wo das Wasser tiefer ist als die Figur, wird geschwommen.</p>
+      <p class="hint">Stell dich ans Ufer und klick „Auf meine Höhe setzen". Wo das Wasser tiefer ist als die Figur, wird geschwommen – außer „Nicht schwimmen" ist an, dann ist dort eine unsichtbare Grenze. Im flachen Wasser kann man trotzdem waten.</p>
     </div>
     <div class="asec">
       <span class="lbl">Himmel &amp; Licht</span>
@@ -602,9 +603,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const ox = player.position.x, oz = player.position.z;
     player.position.addScaledVector(vel, dt);
     if (mapIndex) {
-      // Nicht über den Kartenrand oder in Löcher laufen
-      if (groundAt(player.position.x, player.position.z) === null) { player.position.x = ox; player.position.z = oz; }
-      else collideObstacles();
+      // Nicht über den Kartenrand, in Löcher oder (falls gesperrt) ins tiefe Wasser; an der Kante entlang rutschen
+      const P = player.position, nx = P.x, nz = P.z;
+      if (!walkable(nx, nz)) {
+        if (!walkable(ox, oz)) { if (groundAt(nx, nz) === null) { P.x = ox; P.z = oz; } } // schon im tiefen Wasser: rausschwimmen erlauben
+        else if (walkable(nx, oz)) P.z = oz; else if (walkable(ox, nz)) P.x = ox; else { P.x = ox; P.z = oz; }
+      }
+      collideObstacles();
     } else {
       player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
       player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
@@ -1848,7 +1853,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   // ---------- Wasser ----------
   let water = null, waterTex = null, mapTop = 100;
-  const cleanWater = w => w && typeof w === 'object' && Number.isFinite(+w.level) ? { on: !!w.on, level: Math.max(-1000, Math.min(5000, +w.level)) } : null;
+  const cleanWater = w => w && typeof w === 'object' && Number.isFinite(+w.level) ? { on: !!w.on, level: Math.max(-1000, Math.min(5000, +w.level)), block: !!w.block } : null;
+  // Begehbar: Boden vorhanden und – wenn das Schwimmen gesperrt ist – nicht tiefer als die Schwimmhöhe
+  function walkable(x, z) {
+    const g = groundAt(x, z); if (g === null) return false;
+    const wl = waterLevel();
+    if (wl !== null && mapCfg.water.block && g < wl - modelHeight * 0.65) return false;
+    return true;
+  }
   const waterLevel = () => mapLoaded && mapCfg && mapCfg.water && mapCfg.water.on ? mapCfg.water.level : null;
   function waterTexture() {
     const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -1909,10 +1921,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function renderEnvAdmin() {
     const has = !!(mapCfg && mapLoaded);
-    ['waterOn', 'waterLevel', 'waterHere', 'envPreset', 'envSky', 'envFog', 'envLight', 'envSun'].forEach(id => $(id).disabled = !has);
+    ['waterOn', 'waterBlock', 'waterLevel', 'waterHere', 'envPreset', 'envSky', 'envFog', 'envLight', 'envSun'].forEach(id => $(id).disabled = !has);
     const w = (mapCfg && mapCfg.water) || { on: false, level: 0 }, e = (mapCfg && mapCfg.env) || ENV_DEFAULT;
     $('waterLevel').min = Math.floor(-20); $('waterLevel').max = Math.ceil(mapTop + 20);
-    $('waterOn').checked = w.on; $('waterLevel').value = w.level; $('waterVal').textContent = (+w.level).toFixed(1);
+    $('waterOn').checked = w.on; $('waterBlock').checked = !!w.block; $('waterLevel').value = w.level; $('waterVal').textContent = (+w.level).toFixed(1);
     $('envSky').value = e.sky; $('envFog').value = e.fog; $('envFogVal').textContent = Math.round(e.fog);
     $('envLight').value = e.light; $('envLightVal').textContent = (+e.light).toFixed(2);
     $('envSun').value = e.sun; $('envSunVal').textContent = Math.round(e.sun) + '°';
@@ -1926,6 +1938,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const setEnv = patch => { if (!mapCfg) return; mapCfg.env = cleanEnv(Object.assign({}, ENV_DEFAULT, mapCfg.env, patch)); envChanged(); };
   applyEnv();
   $('waterOn').onchange = e => setWater({ on: e.target.checked });
+  $('waterBlock').onchange = e => setWater({ block: e.target.checked, on: true });
   $('waterLevel').oninput = e => setWater({ level: +e.target.value, on: true });
   $('waterHere').onclick = () => setWater({ level: Math.round(player.position.y * 10) / 10, on: true });
   $('envPreset').onchange = e => { const p = ENV_PRESETS[e.target.value]; e.target.value = ''; if (p) setEnv(p); };
