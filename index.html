@@ -178,6 +178,7 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 
 .keys { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
   display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 12px; color: var(--muted); }
+.fps { position: fixed; z-index: 2; right: max(8px, env(safe-area-inset-right, 0px)); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 10px var(--f-mono); color: var(--parch); opacity: 0.7; text-shadow: 0 1px 3px #000; pointer-events: none; }
 .keys .keyshead { grid-column: 1 / -1; background: none; border: 0; padding: 0 0 4px; text-align: left; color: var(--gold); font: 11px var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; }
 .keys .keyshead::after { content: " ▾"; color: var(--muted); }
 .keys.collapsed { padding: 6px 12px; }
@@ -388,6 +389,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <label class="check"><input type="checkbox" id="setMinimap" checked> Minimap anzeigen</label>
       <label class="check"><input type="checkbox" id="setKeys" checked> Steuerungshilfe anzeigen</label>
       <label class="check"><input type="checkbox" id="setNames" checked> Namen über Mitspielern</label>
+      <span class="mlbl">Grafik</span>
+      <div class="field"><label for="setGfx">Qualität</label><select id="setGfx"><option value="high">Hoch</option><option value="mid">Mittel</option><option value="low">Niedrig (flüssiger)</option></select></div>
+      <label class="check"><input type="checkbox" id="setFps"> Bilder pro Sekunde anzeigen</label>
       <button class="btn mbtn" id="mBack">Zurück</button>
     </div>
   </div>
@@ -399,7 +403,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 03:00</p>
+<p class="fps" id="fpsBox" hidden></p>
+<p class="ver">v 04.11. 03:15</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -875,7 +880,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   // ---------- Steuerung (WoW-Stil) ----------
   // Werte in Yards wie im Original: Laufen 7 y/s, Rückwärts 4,5 y/s, Drehen 180°/s, Sprung ~1,6 y hoch
-  let swimming = false, sunEl = 50;
+  let swimming = false, sunEl = 50, fpsN = 0, fpsT = 0, fpsT0 = 0;
   const MOVE = { sprint: 1.6, swim: 4.72, run: 7, back: 4.5, turn: Math.PI, jumpV: 7.96, g: 19.29, mouse: 0.005 };
   const keys = new Set();
   let autorun = false;
@@ -1069,6 +1074,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (play) { const c = `${player.position.x.toFixed(0)}, ${player.position.z.toFixed(0)}${autorun ? ' · Autolauf' : ''}`; if ($('mmCoords').textContent !== c) $('mmCoords').textContent = c; updatePortraits(); }
 
     updateEnvFrame(dt);
+    if (settings.fps) { const tn = performance.now(); fpsN++; if (!fpsT0) fpsT0 = tn; if (tn - fpsT0 >= 500) { $('fpsBox').textContent = Math.round(fpsN * 1000 / (tn - fpsT0)) + ' FPS'; fpsN = 0; fpsT0 = tn; } }
     drawMinimap();
     updateActionBar();
     tickBubbles();
@@ -1264,6 +1270,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     }
     const target = parseFloat($('height').value);
     myFit = fitInto(pivot, model, target, rotOffset);
+    if (typeof requestPortrait === 'function') setTimeout(() => requestPortrait('me'), 300);
     const lift = +$('lift').value || 0; // Füße etwas anheben, falls die Animation in den Boden ragt
     if (myFit) { model.position.y += lift; myFit.of[1] += lift; }
     modelHeight = target;
@@ -1589,7 +1596,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (R.mk !== key || !remotes.has(R.peer)) { res.urls.forEach(URL.revokeObjectURL); disposeModel(res.root); return; }
       R.model = res.root; R.urls = res.urls; R.clips = res.anims;
       R.mixer = res.anims.length ? new THREE.AnimationMixer(res.root) : null;
-      R.pv.add(res.root); R.ph.visible = false;
+      R.pv.add(res.root); R.ph.visible = false; if (typeof requestPortrait === 'function') setTimeout(() => requestPortrait(R.peer), 500);
       applyRemoteLook(R, R.lastPr || pr);
     } catch (e) { console.warn(e); }
   }
@@ -2713,7 +2720,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!f) {
         f = document.createElement('div'); f.className = 'uf member'; f.dataset.id = id;
         f.innerHTML = '<canvas class="uf-por" data-el="por" width="96" height="96" aria-hidden="true"></canvas><div class="uf-main"><div class="uf-name" data-el="name"><b></b><small></small></div><div class="uf-bar hp" data-el="hp"><i></i><span></span></div><div class="uf-bar mp" data-el="mp"><i></i><span></span></div></div>';
-        box.append(f); portraitCanvases.set(id, f.querySelector('canvas'));
+        box.append(f); portraitCanvases.set(id, f.querySelector('canvas')); requestPortrait(id);
       }
       const num = (v, d) => Number.isFinite(v) ? v : d;
       f.querySelector('.uf-name b').textContent = String(st.n || 'Abenteurer').slice(0, 24);
@@ -2736,7 +2743,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     porCam.position.set(p.x + Math.sin(yaw) * d, head + height * 0.06, p.z + Math.cos(yaw) * d);
     porCam.lookAt(p.x, head - height * 0.04, p.z);
     const was = hide.map(o => o && o.visible); hide.forEach(o => { if (o) o.visible = false; });
+    const sa = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false; // Schatten nicht neu berechnen
     renderer.setRenderTarget(porRT); renderer.render(scene, porCam); renderer.setRenderTarget(null);
+    renderer.shadowMap.autoUpdate = sa;
     hide.forEach((o, i) => { if (o) o.visible = was[i]; });
     renderer.readRenderTargetPixels(porRT, 0, 0, 128, 128, porBuf);
     const g = canvasEl.getContext('2d'), W = canvasEl.width;
@@ -2745,10 +2754,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (W === 128) g.putImageData(img, 0, 0);
     else { const tmp = document.createElement('canvas'); tmp.width = tmp.height = 128; tmp.getContext('2d').putImageData(img, 0, 0); g.drawImage(tmp, 0, 0, W, W); }
   }
+  // Porträts nur bei Bedarf neu (Figur gewechselt, Mitspieler neu, alle 20 s), höchstens eins pro Sekunde:
+  // Das Auslesen aus der Grafikkarte kostet kurz Zeit und hat vorher das Ruckeln verursacht.
+  const porDirty = new Set(['me']); let porRefresh = 0;
+  function requestPortrait(id) { porDirty.add(id); }
   function updatePortraits() {
-    const now = performance.now(); if (now - porLast < 400) return; porLast = now;
-    if (!porQueue.length) porQueue = ['me', ...netStates.keys()];
-    const id = porQueue.shift(), cv = portraitCanvases.get(id); if (!cv) return;
+    const now = performance.now();
+    if (now - porRefresh > 20000) { porRefresh = now; porDirty.add('me'); for (const id of netStates.keys()) porDirty.add(id); }
+    if (!porDirty.size || now - porLast < 1000) return; porLast = now;
+    const id = porDirty.values().next().value; porDirty.delete(id);
+    const cv = portraitCanvases.get(id); if (!cv) return;
     try {
       if (id === 'me') shootPortrait(cv, player, modelHeight, facing, [selfBubbleHolder.bubble]);
       else { const R = remotes.get(id); if (R && R.group.visible) shootPortrait(cv, R.group, R.model ? R.h : 2, R.group.rotation.y, [R.tag, R.bubble]); }
@@ -3192,7 +3207,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   // ---------- Spielmenü & Einstellungen ----------
   let menuOpen = false, worldLeft = false;
-  const settings = { mouse: 1, invert: false, minimap: true, keys: true, names: true };
+  const settings = { mouse: 1, invert: false, minimap: true, keys: true, names: true, gfx: 'high', fps: false };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('wf-settings') || '{}')); } catch (_) {}
   settings.minimap = true; // Minimap startet immer sichtbar; ausblenden gilt nur bis zum Neuladen
   function saveSettingsLocal() { try { localStorage.setItem('wf-settings', JSON.stringify(settings)); } catch (_) {} }
@@ -3200,6 +3215,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('setMouse').value = settings.mouse; $('setMouseVal').textContent = (+settings.mouse).toFixed(2) + '×';
     $('setInvert').checked = settings.invert; $('setMinimap').checked = settings.minimap;
     $('setKeys').checked = settings.keys; $('setNames').checked = settings.names;
+    $('setGfx').value = settings.gfx; $('setFps').checked = settings.fps;
     applyVol();
   }
   function applyDisplay() {
@@ -3231,6 +3247,18 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('setMinimap').onchange = e => { settings.minimap = e.target.checked; saveSettingsLocal(); applyDisplay(); };
   $('setKeys').onchange = e => { settings.keys = e.target.checked; saveSettingsLocal(); applyDisplay(); };
   $('setNames').onchange = e => { settings.names = e.target.checked; saveSettingsLocal(); applyDisplay(); };
+  $('setGfx').onchange = e => { settings.gfx = e.target.value; saveSettingsLocal(); applyGfx(); };
+  $('setFps').onchange = e => { settings.fps = e.target.checked; saveSettingsLocal(); $('fpsBox').hidden = !settings.fps; };
+  // Grafikqualität: Auflösung und Schatten
+  function applyGfx() {
+    const g = settings.gfx, dpr = window.devicePixelRatio || 1;
+    renderer.setPixelRatio(g === 'high' ? Math.min(dpr, 2) : g === 'mid' ? 1 : 0.75);
+    const size = g === 'high' ? 2048 : 1024;
+    sun.castShadow = g !== 'low';
+    if (sun.shadow.mapSize.x !== size) { sun.shadow.mapSize.set(size, size); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+    resize();
+  }
+  applyGfx(); $('fpsBox').hidden = !settings.fps;
 
   // ---------- Ladebalken ----------
   const loadTasks = new Map(), waitTimers = new Map();
