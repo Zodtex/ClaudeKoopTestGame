@@ -134,7 +134,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud brand">
   <h1>Wanderfeld</h1>
   <p id="coords">x 0.0 · z 0.0</p>
-  <p class="ver">Version 03.11. 17:05</p>
+  <p class="ver">Version 03.11. 17:15</p>
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
@@ -268,6 +268,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <span class="lbl">Charakterliste</span>
       <div id="rosterRows" class="slots"></div>
       <button class="btn ghost" id="adminFolder">Exportordner wählen</button>
+      <div class="netstate" id="importState"></div>
       <p class="hint">Name und wow.export-Pfad eintragen (z. B. creature/dragonwhelp/dragonwhelptarecgosa.m2), dann deinen Exportordner wählen. Speichern für alle mit „Dauerhaft speichern".</p>
     </div>
     <div class="asec">
@@ -897,7 +898,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const has = sl && sl.files && sl.files.length;
       b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
       b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
-      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? (net.ready ? 'wird übertragen …' : 'fehlt · Spiel beitreten') : 'wird übertragen …') : 'Leer · Platzhalter';
+      b.querySelector('.meta').textContent = has ? (sl.file || sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? (net.ready ? 'wird übertragen …' : 'fehlt · Spiel beitreten') : 'wird übertragen …') : 'Leer · Platzhalter';
       b.onclick = () => activateSlot(i);
       b.ondblclick = () => { activateSlot(i); enterPlay(); };
       list.append(b);
@@ -1416,7 +1417,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
     const sl = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
     const files = await sharedGet(mk);
-    if (files) sl.files = files;
+    if (files) { sl.files = files; sl.file = files[0] && files[0].name; }
     return sl;
   }
   async function enterRepoRoster(list) {
@@ -1438,11 +1439,18 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     status('Durchsuche Exportordner …');
     for (const sl of slots) {
       if (!sl || !sl.stem) continue;
-      const leaf = sl.stem.split('/').pop();
-      const isModel = f => /\.gltf$/i.test(f.name);
-      const main = files.find(f => isModel(f) && rel(f).replace(/\.gltf$/, '').endsWith(sl.stem))
-        || files.find(f => isModel(f) && base(f.name) === leaf + '.gltf');
-      if (!main) { missing.push(sl.name); continue; }
+      const leaf = sl.stem.split('/').pop(), dirPath = sl.stem.split('/').slice(0, -1).join('/');
+      const gltfs = files.filter(f => /\.gltf$/i.test(f.name)).sort((a, b) => rel(a).localeCompare(rel(b)));
+      const noExt = f => rel(f).replace(/\.gltf$/, '');
+      const inDir = f => !dirPath || rel(f).split('/').slice(0, -1).join('/').endsWith(dirPath);
+      // 1) exakter Pfad  2) gleicher Name irgendwo  3) wow.export hängt oft den Skin an: modell_skin.gltf im selben Ordner
+      const main = gltfs.find(f => noExt(f).endsWith(sl.stem))
+        || gltfs.find(f => base(f.name) === leaf + '.gltf')
+        || gltfs.find(f => inDir(f) && base(f.name).startsWith(leaf + '_'))
+        || gltfs.find(f => base(f.name).startsWith(leaf + '_'))
+        || gltfs.find(f => inDir(f) && base(f.name).startsWith(leaf));
+      if (!main) { missing.push(sl.name || leaf); continue; }
+      sl.file = main.name;
       let deps = [];
       try {
         const json = JSON.parse(await main.text());
@@ -1464,8 +1472,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     renderSlots();
     if (slots[active] && slots[active].files.length) activateSlot(active);
     else { const i = slots.findIndex(sl => sl && sl.files && sl.files.length); if (i >= 0) activateSlot(i); }
-    if (missing.length) status(`Gefunden: ${found.join(', ') || 'nichts'}. Fehlt noch: ${missing.join(', ')} – exportiere ${missing.length > 1 ? 'sie' : 'es'} mit wow.export als glTF.`, 'err');
-    else if (found.length) status(`Alle Charaktere gefunden: ${found.join(', ')}.`, 'ok');
+    const e = $('importState');
+    if (!found.length && !missing.length) { e.textContent = 'Trag zuerst bei mindestens einem Platz einen Pfad ein.'; e.className = 'netstate err'; }
+    else if (missing.length) { e.textContent = `Gefunden: ${found.join(', ') || 'nichts'}. Nicht gefunden: ${missing.join(', ')}. Prüfe den Pfad oder exportiere als glTF.`; e.className = 'netstate err'; }
+    else { e.textContent = `Alle gefunden: ${found.join(', ')}.`; e.className = 'netstate ok'; }
   }
 
   // ---------- Admin-Funktionen ----------
@@ -1496,7 +1506,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function renderRosterRows() {
     const box = $('rosterRows');
-    if (box.contains(document.activeElement)) return; // nicht beim Tippen neu aufbauen
+    const stText = sl => !sl || !sl.mk ? ['leer', false] : (sl.files && sl.files.length) ? [`Modell vorhanden${sl.file ? ' · ' + sl.file : ''}`, true] : ['Modell fehlt · Exportordner wählen', false];
+    if (box.contains(document.activeElement) && box.children.length === 3) {
+      // Beim Tippen nicht neu aufbauen, nur den Stand aktualisieren
+      [...box.children].forEach((d, i) => { const [t, ok] = stText(slots[i]); const st = d.querySelector('.st'); st.textContent = t; st.classList.toggle('ok', ok); });
+      return;
+    }
     box.innerHTML = '';
     for (let i = 0; i < 3; i++) {
       const sl = slots[i];
@@ -1505,9 +1520,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const nm = d.querySelector('.nm'), pa = d.querySelector('.path'), st = d.querySelector('.st');
       nm.id = 'rosterName' + i; pa.id = 'rosterPath' + i;
       nm.value = (sl && sl.name) || ''; pa.value = (sl && sl.path) || '';
-      const has = sl && sl.files && sl.files.length;
-      st.textContent = !sl || !sl.mk ? 'leer' : has ? 'Modell vorhanden' : 'Modell fehlt · Exportordner wählen';
-      if (has) st.classList.add('ok');
+      const [t, ok] = stText(sl); st.textContent = t; st.classList.toggle('ok', ok);
       nm.onchange = () => {
         const v = nm.value.trim().slice(0, 24);
         if (slots[i]) slots[i].name = v; else if (v) slots[i] = { name: v, files: [] };
@@ -1531,6 +1544,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     }
   }
   $('adminFolder').onclick = () => $('folderInput').click();
+  $('adminFolder').onmousedown = () => { const a = document.activeElement; if (a && a.closest && a.closest('#rosterRows')) a.blur(); };
   $('playerName').value = playerName;
   $('playerName').oninput = e => {
     playerName = e.target.value.trim().slice(0, 20);
