@@ -77,6 +77,8 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 .party .mem small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 10.5px; flex: none; }
 .adminbtn { right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); background: rgba(208,166,78,0.22); color: var(--parch); border: 1px solid var(--gold); border-radius: 4px; padding: 7px 14px; font: 600 12px var(--f-display); letter-spacing: 0.1em; cursor: pointer; }
 .adminpanel { top: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); width: 300px; max-height: calc(100% - 90px); border-color: rgba(208,166,78,0.55); z-index: 3; }
+.field.anim { grid-template-columns: 82px minmax(0, 1fr) auto; }
+.pv { padding: 4px 8px; }
 .asec { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .asec .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
 textarea { width: 100%; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font: 11px/1.45 var(--f-mono); resize: vertical; }
@@ -172,6 +174,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
     <fieldset id="modelSettings" disabled>
       <legend>Anpassen</legend>
+      <p class="hint" id="editNote" hidden>Du spielst beim Bearbeiten selbst diesen Charakter. Änderungen gelten für alle; als Gastgeber sehen deine Mitspieler sie sofort.</p>
       <div class="field">
         <label for="height">Größe</label>
         <div><input type="range" id="height" min="0.5" max="8" step="0.1" value="2"><span class="val" id="heightVal">2.0 m</span></div>
@@ -184,17 +187,35 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         </div>
       </div>
       <label class="check"><input type="checkbox" id="alpha"> Alpha-Cutout (für Haare, Blätter, Umhänge)</label>
-      <div class="field">
+      <div class="field anim">
         <label for="animIdle">Stehen</label>
         <select id="animIdle"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animIdle" title="Vorschau abspielen" aria-label="Stehen ansehen">▶</button>
       </div>
-      <div class="field">
+      <div class="field anim">
         <label for="animWalk">Laufen</label>
         <select id="animWalk"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animWalk" title="Vorschau abspielen" aria-label="Laufen ansehen">▶</button>
       </div>
-      <div class="field">
+      <div class="field anim">
         <label for="animBack">Rückwärts</label>
         <select id="animBack"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animBack" title="Vorschau abspielen" aria-label="Rückwärts ansehen">▶</button>
+      </div>
+      <div class="field anim">
+        <label for="animSL">Seitwärts links</label>
+        <select id="animSL"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animSL" title="Vorschau abspielen" aria-label="Seitwärts links ansehen">▶</button>
+      </div>
+      <div class="field anim">
+        <label for="animSR">Seitwärts rechts</label>
+        <select id="animSR"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animSR" title="Vorschau abspielen" aria-label="Seitwärts rechts ansehen">▶</button>
+      </div>
+      <div class="field anim">
+        <label for="animJump">Springen</label>
+        <select id="animJump"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animJump" title="Vorschau abspielen" aria-label="Springen ansehen">▶</button>
       </div>
       <button class="btn ghost danger" id="resetModel">Modell entfernen</button>
     </fieldset>
@@ -229,8 +250,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <p class="hint">Läuft in Schleife, bis du dich bewegst. Mitspieler sehen sie auch.</p>
     </div>
     <div class="asec">
-      <span class="lbl">Charaktere für alle</span>
-      <p class="hint">Im Panel „Modell" kannst du Größe, Blickrichtung, Alpha und die Animationen für Stehen, Laufen und Rückwärts jetzt ändern. Als Gastgeber übernehmen deine Mitspieler das sofort.</p>
+      <span class="lbl">Charakter bearbeiten</span>
+      <select id="edChar" aria-label="Charakter"></select>
+      <div id="adminEdit"></div>
       <button class="btn ghost" id="rosterExport">Dauerhaft speichern …</button>
       <div id="rosterOut" hidden>
         <p class="hint">Kopiere den Text, öffne roster.json auf GitHub, ersetze den Inhalt und klicke „Commit changes". Oder schick ihn Claude.</p>
@@ -344,7 +366,17 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   leanGroup.add(placeholder);
 
   let model = null, modelHeight = 2, rotOffset = -Math.PI / 2;
-  let mixer = null, clips = [], actIdle = null, actWalk = null, actBack = null, current = null;
+  let mixer = null, clips = [], actIdle = null, actWalk = null, actBack = null, current = null, acts = {};
+  // Bewegung → Auswahlfeld, Erkennungsmuster für wow.export-Animationsnamen, Kürzel im Netzwerk
+  const ANIMS = [
+    { k: 'idle', id: 'animIdle', re: /stand|idle/i, fb: 0, net: 'ai' },
+    { k: 'walk', id: 'animWalk', re: /^(?!.*back)(run|walk)/i, fb: -1, net: 'aw' },
+    { k: 'back', id: 'animBack', re: /back/i, fb: -1, net: 'ab' },
+    { k: 'sl', id: 'animSL', re: /shuffleleft|strafeleft/i, fb: -1, net: 'asl' },
+    { k: 'sr', id: 'animSR', re: /shuffleright|straferight/i, fb: -1, net: 'asr' },
+    { k: 'jump', id: 'animJump', re: /^jump\b/i, fb: -1, net: 'aj' },
+  ];
+  const ANIM_KEYS = ANIMS.map(a => a.k);
   let blobURLs = [];
 
   // ---------- Steuerung (WoW-Stil) ----------
@@ -452,12 +484,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(fwd < 0 ? MOVE.back : MOVE.run);
       if (k('Space')) { velY = MOVE.jumpV; onGround = false; } // Im Sprung bleibt die Richtung fest
       leanTarget = fwd > 0 ? str * Math.PI / 4 : fwd < 0 ? -str * Math.PI / 4 : str * Math.PI / 2;
-      moveState = !moving ? 'idle' : fwd < 0 ? 'back' : 'run';
+      moveState = !moving ? 'idle' : fwd < 0 ? 'back' : fwd === 0 ? (str > 0 ? 'sl' : 'sr') : 'run';
+      if ((moveState === 'sl' && acts.sl) || (moveState === 'sr' && acts.sr)) leanTarget = 0; // eigene Seitwärts-Animation: nicht drehen
     }
     player.position.addScaledVector(vel, dt);
     velY -= MOVE.g * dt;
     player.position.y += velY * dt;
     if (player.position.y <= 0) { player.position.y = 0; velY = 0; onGround = true; }
+    if (!onGround) moveState = 'jump';
     player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
     player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
     player.rotation.y = facing;
@@ -467,13 +501,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
     if (emote && moveState !== 'idle') stopEmote();
     if (mixer) {
-      if (moveState === 'idle' && emoteAct) setAction(emoteAct);
-      else if (moveState === 'idle') setAction(actIdle || actWalk);
-      else if (moveState === 'back') {
-        if (actBack) setAction(actBack);
-        else if (actWalk) { setAction(actWalk); actWalk.timeScale = -0.7; }
-      } else setAction(actWalk || actIdle);
-      if (actWalk && moveState !== 'back') actWalk.timeScale = 1;
+      setAction(pickAction(acts, moveState, emoteAct, current));
+      if (acts.walk) acts.walk.timeScale = (moveState === 'back' && !acts.back) ? -0.7 : 1;
       mixer.update(dt);
     }
 
@@ -617,19 +646,15 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     clips = anims;
     if (clips.length) {
       mixer = new THREE.AnimationMixer(model);
-      fillSelect($('animIdle'), clips, /stand|idle/i, 0);
-      fillSelect($('animWalk'), clips, /^(?!.*back).*(run|walk)/i, -1);
-      fillSelect($('animBack'), clips, /back/i, -1);
-      if (settings) {
-        selectByName($('animIdle'), settings.idle); selectByName($('animWalk'), settings.walk); selectByName($('animBack'), settings.back);
-      }
+      ANIMS.forEach(a => { fillSelect($(a.id), clips, a.re, a.fb); if (settings) selectByName($(a.id), settings[a.k]); });
       applyAnims();
     } else {
-      ['animIdle', 'animWalk', 'animBack'].forEach(id => fillSelect($(id), [], null, -1));
+      ANIMS.forEach(a => fillSelect($(a.id), [], null, -1));
     }
     $('modelSettings').disabled = rosterMode && !(isAdmin && rosterSource === 'repo');
     fillEmotes();
-    $('animIdle').disabled = $('animWalk').disabled = $('animBack').disabled = !clips.length;
+    ANIMS.forEach(a => { $(a.id).disabled = !clips.length; });
+    document.querySelectorAll('.pv').forEach(b => b.disabled = !clips.length);
     $('height').value = settings?.height ?? 2;
     $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
     rotOffset = settings?.rot ?? -Math.PI / 2;
@@ -658,7 +683,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!mixer) return;
     mixer.stopAllAction(); current = null;
     const get = sel => sel.value === '' ? null : mixer.clipAction(clips[+sel.value]);
-    actIdle = get($('animIdle')); actWalk = get($('animWalk')); actBack = get($('animBack'));
+    acts = {}; ANIMS.forEach(a => { acts[a.k] = get($(a.id)); });
+    actIdle = acts.idle; actWalk = acts.walk; actBack = acts.back;
   }
 
   // Begrenzungsbox im Raum des Pivots (unabhängig davon, wo die Figur gerade steht),
@@ -719,7 +745,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function clearModel() {
     if (mixer) { mixer.stopAllAction(); mixer = null; }
     emote = null; emoteAct = null;
-    actIdle = actWalk = actBack = current = null; clips = [];
+    actIdle = actWalk = actBack = current = null; acts = {}; clips = [];
     if (model) {
       pivot.remove(model);
       disposeModel(model);
@@ -736,7 +762,23 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('rotL').onclick = () => { rotOffset += Math.PI / 2; fitModel(); saveSettings(); };
   $('rotR').onclick = () => { rotOffset -= Math.PI / 2; fitModel(); saveSettings(); };
   $('alpha').onchange = () => { applyAlpha(); saveSettings(); };
-  ['animIdle', 'animWalk', 'animBack'].forEach(id => $(id).onchange = () => { applyAnims(); saveSettings(); });
+  ANIMS.forEach(a => $(a.id).onchange = () => { applyAnims(); saveSettings(); });
+  document.querySelectorAll('.pv').forEach(b => b.onclick = () => {
+    const sel = $(b.dataset.for); if (!mixer || sel.value === '') return;
+    playEmoteClip(clips[+sel.value]);
+  });
+
+  // Welche Animation zu welcher Bewegung (gilt für dich und für Mitspieler)
+  function pickAction(A, st, em, cur) {
+    switch (st) {
+      case 'idle': return em || A.idle || A.walk;
+      case 'back': return A.back || A.walk || A.idle;
+      case 'sl': return A.sl || A.walk || A.idle;
+      case 'sr': return A.sr || A.walk || A.idle;
+      case 'jump': return A.jump || cur || A.idle;
+      default: return A.walk || A.idle;
+    }
+  }
   $('resetModel').onclick = () => { removeModel(); };
 
   // ---------- Charakterplätze (IndexedDB, nur in diesem Browser) ----------
@@ -794,7 +836,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function saveSettings(now) {
     const slot = slots[active]; if (!slot || !model) return;
     slot.settings = { height: +$('height').value, rot: rotOffset, alpha: $('alpha').checked,
-      idle: clipName($('animIdle')), walk: clipName($('animWalk')), back: clipName($('animBack')) };
+      ...Object.fromEntries(ANIMS.map(a => [a.k, clipName($(a.id))])) };
     clearTimeout(saveTimer);
     if (isAdmin && rosterSource === 'repo' && slot.mk) {
       overrides[slot.mk] = slot.settings;
@@ -824,6 +866,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const has = slots[active] && slots[active].files && slots[active].files.length;
     $('slotClear').disabled = !slots[active];
     if (rosterMode) lockUI(true);
+    if (typeof renderEditor === 'function' && isAdmin) renderEditor();
   }
 
   function showPlaceholder(msg) {
@@ -961,7 +1004,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const byName = n => { const c = R.clips.find(c => c.name === n); return c ? R.mixer.clipAction(c) : null; };
     if (R.mixer) {
       R.mixer.stopAllAction(); R.cur = null;
-      R.acts = { idle: byName(pr.ai), walk: byName(pr.aw), back: byName(pr.ab) };
+      R.acts = {}; ANIMS.forEach(a => { R.acts[a.k] = byName(pr[a.net]); });
       const pose = R.acts.idle || R.acts.walk; if (pose) { pose.reset(); pose.setEffectiveWeight(1); pose.play(); R.cur = pose; R.mixer.update(0); }
     }
     const rot = typeof pr.r === 'number' ? pr.r : -Math.PI / 2;
@@ -1006,7 +1049,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!R.init) { R.init = true; R.group.position.set(R.t.x, R.t.y, R.t.z); R.group.rotation.y = R.t.f; }
     const mk = typeof pr.mk === 'string' ? pr.mk.toLowerCase() : null;
     if (mk !== R.mk) { R.mk = mk; R.sig = ''; dropRemoteModel(R); if (mk) loadRemoteModel(R, pr); }
-    const sig = JSON.stringify([pr.h, pr.r, pr.a, pr.ai, pr.aw, pr.ab, pr.sc, pr.of]);
+    const sig = JSON.stringify([pr.h, pr.r, pr.a, ...ANIMS.map(a => pr[a.net]), pr.sc, pr.of]);
     if (sig !== R.sig) { R.sig = sig; applyRemoteLook(R, pr); }
   }
 
@@ -1043,7 +1086,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (R.mixer) {
         const a = R.acts;
         if (t.em !== R.emName) { R.emName = t.em; const c = t.em ? R.clips.find(c => c.name === t.em) : null; R.emAct = c ? R.mixer.clipAction(c) : null; }
-        let next = t.s === 'idle' ? (R.emAct || a.idle || a.walk) : t.s === 'back' ? (a.back || a.walk) : (a.walk || a.idle);
+        let next = pickAction(a, t.s, R.emAct, R.cur);
         if (next && next !== R.cur) { next.reset().fadeIn(0.2).play(); if (R.cur) R.cur.fadeOut(0.2); R.cur = next; }
         if (a.walk) a.walk.timeScale = (t.s === 'back' && !a.back) ? -0.7 : 1;
         R.mixer.update(dt);
@@ -1058,7 +1101,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
           em: emote,
           sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
-          ai: model ? clipName($('animIdle')) : null, aw: model ? clipName($('animWalk')) : null, ab: model ? clipName($('animBack')) : null }
+          ...Object.fromEntries(ANIMS.map(a => [a.net, model ? clipName($(a.id)) : null])) }
       : { m: 'select', n: myName(), c: myHue, p: null, mk: null };
     const json = JSON.stringify(me);
     if (json === lastSent && keepAlive < 2) return;
@@ -1320,7 +1363,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const c = list[i], stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
       const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
       if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
-      ['idle', 'walk', 'back'].forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
+      ANIM_KEYS.forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
       if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
       next[i] = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
       const files = await sharedGet(mk);
@@ -1380,17 +1423,31 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function playEmote() {
     if (!mixer || $('emoteSel').value === '') return;
-    const clip = clips[+$('emoteSel').value]; if (!clip) return;
-    emote = clip.name; emoteAct = mixer.clipAction(clip); emoteAct.setLoop(THREE.LoopRepeat);
+    playEmoteClip(clips[+$('emoteSel').value]);
   }
   function stopEmote() { emote = null; emoteAct = null; }
+  function playEmoteClip(clip) {
+    if (!mixer || !clip) return;
+    emote = clip.name; emoteAct = mixer.clipAction(clip); emoteAct.setLoop(THREE.LoopRepeat);
+  }
+  // Charakterauswahl im Editor = Plätze, die ein Modell haben
+  function renderEditor() {
+    const sel = $('edChar'); sel.innerHTML = '';
+    slots.forEach((sl, i) => {
+      if (!sl || !(sl.files && sl.files.length)) return;
+      const o = document.createElement('option'); o.value = i; o.textContent = `${ROMAN[i]} · ${sl.name || 'Charakter ' + (i + 1)}`; sel.append(o);
+    });
+    if (!sel.options.length) { sel.innerHTML = '<option value="">– noch kein Modell geladen –</option>'; sel.disabled = true; }
+    else { sel.disabled = false; sel.value = String(active); }
+  }
+  $('edChar').onchange = e => { if (e.target.value !== '') activateSlot(+e.target.value); };
   function applyCfg(mk, set) {
     if (typeof mk !== 'string' || !set || typeof set !== 'object') return;
     const clean = {};
     if (Number.isFinite(set.height)) clean.height = Math.min(8, Math.max(0.5, set.height));
     if (Number.isFinite(set.rot)) clean.rot = set.rot;
     clean.alpha = !!set.alpha;
-    ['idle', 'walk', 'back'].forEach(k => { if (typeof set[k] === 'string' || set[k] === null) clean[k] = set[k]; });
+    ANIM_KEYS.forEach(k => { if (typeof set[k] === 'string' || set[k] === null) clean[k] = set[k]; });
     const i = slots.findIndex(sl => sl && sl.mk === mk); if (i < 0) return;
     slots[i].settings = Object.assign({}, slots[i].settings, clean);
     if (i === active && model) liveSettings(slots[i].settings);
@@ -1399,14 +1456,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('height').value = set.height ?? 2; $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
     if (Number.isFinite(set.rot)) rotOffset = set.rot;
     $('alpha').checked = !!set.alpha;
-    if (clips.length) { selectByName($('animIdle'), set.idle); selectByName($('animWalk'), set.walk); selectByName($('animBack'), set.back); applyAnims(); }
+    if (clips.length) { ANIMS.forEach(a => selectByName($(a.id), set[a.k])); applyAnims(); }
     applyAlpha(); fitModel();
   }
   function rosterJson() {
     const characters = slots.filter(sl => sl && sl.mk).map(sl => {
       const st = sl.settings || {}, o = { name: sl.name, path: sl.path, height: +(st.height ?? 2).toFixed(2), alpha: !!st.alpha };
       if (Number.isFinite(st.rot) && Math.abs(st.rot + Math.PI / 2) > 1e-3) o.rotation = Math.round(st.rot * 180 / Math.PI);
-      ['idle', 'walk', 'back'].forEach(k => { if (st[k] !== undefined) o[k] = st[k]; });
+      ANIM_KEYS.forEach(k => { if (st[k] !== undefined) o[k] = st[k]; });
       return o;
     });
     return JSON.stringify({ _hinweis: 'Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.', characters }, null, 2);
@@ -1414,6 +1471,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function showAdmin() {
     $('adminBtn').hidden = !isAdmin;
     if (!isAdmin) $('adminPanel').hidden = true;
+    // Für den Admin wandert der Editor ins Admin-Panel
+    const fs = $('modelSettings');
+    if (isAdmin) $('adminEdit').append(fs); else $('panel').querySelector('.body').append(fs);
+    $('editNote').hidden = !isAdmin;
+    renderEditor();
   }
   $('adminBtn').onclick = () => { $('adminPanel').hidden = !$('adminPanel').hidden; };
   $('adminClose').onclick = () => { $('adminPanel').hidden = true; };
