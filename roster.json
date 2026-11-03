@@ -61,10 +61,11 @@
       "sun": 45
     },
     "audio": {
-      "music": "audio:music:mus_c_stranglethorn_2.mp3:1487129",
-      "amb": null,
-      "mn": 1,
-      "an": 0
+      "music": "audio:music:mus_c_stranglethorn_1.mp3+mus_c_stranglethorn_2.mp3+mus_c_stranglethorn_3.mp3+mus_c_stranglethorn_4.mp3:5827309",
+      "amb": "audio:amb:jungleday.ogg:424881",
+      "mn": 4,
+      "an": 1,
+      "pause": "wow"
     }
   },
   "ui": {
@@ -97,26 +98,12 @@
     "capS": 165,
     "capX": -44,
     "capY": null,
-    "pfX": 0,
-    "pfY": 0,
-    "pfW": 369,
-    "pfF": true,
-    "paX": null,
-    "paY": null,
-    "paW": null,
-    "paF": false,
     "pfL": {
       "por": [
         5,
         7,
         64,
         64
-      ],
-      "lvl": [
-        3.6,
-        50,
-        24,
-        16
       ],
       "name": [
         69.4,
@@ -135,7 +122,21 @@
         44.1,
         119,
         12
+      ],
+      "lvl": [
+        3.6,
+        50,
+        24,
+        16
       ]
-    }
+    },
+    "pfX": 0,
+    "pfY": 0,
+    "pfW": 369,
+    "pfF": true,
+    "paX": null,
+    "paY": null,
+    "paW": null,
+    "paF": false
   }
 }
