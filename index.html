@@ -58,7 +58,14 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .sndpanel { position: absolute; right: 0; top: calc(100% + 6px); width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .sndpanel .field { grid-template-columns: 74px 1fr; }
 .sndnow { font: 11px var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
-#sndBtn.muted { color: var(--err); text-decoration: line-through; }
+/* Spielmenü (Esc) */
+.menuov { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(8,11,15,0.5); padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+.menubox { width: min(320px, 100%); max-height: calc(100% - 40px); overflow-y: auto; background: var(--panel); border: 1px solid rgba(208,166,78,0.6); border-radius: 8px; padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 16px 50px rgba(0,0,0,0.5); }
+.menubox .mtitle { font: 600 16px var(--f-display); letter-spacing: 0.12em; color: var(--gold); text-align: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.mview { display: flex; flex-direction: column; gap: 9px; }
+.mbtn { padding: 10px; font-size: 14px; }
+.mbtn.danger { color: var(--err); border-color: rgba(224,122,100,0.45); background: transparent; }
+.mlbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
 .minimap .mmzoom button { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(208,166,78,0.7); background: rgba(17,22,28,0.9); color: var(--parch); font: 600 13px/1 var(--f-mono); cursor: pointer; padding: 0; }
 .brand p { margin: 2px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 
@@ -186,12 +193,32 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud minimap" id="minimap" hidden>
   <canvas id="mmCanvas" width="340" height="340" aria-label="Minimap"></canvas>
   <div class="mmzone" id="mmZone">Übungsfeld</div>
-  <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button><button id="sndBtn" title="Ton (M)" aria-label="Toneinstellungen" aria-expanded="false">♪</button></div>
-  <div class="sndpanel" id="sndPanel" hidden>
-    <div class="field"><label for="volMusic">Musik</label><input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5"></div>
-    <div class="field"><label for="volAmb">Umgebung</label><input type="range" id="volAmb" min="0" max="1" step="0.05" value="0.5"></div>
-    <label class="check"><input type="checkbox" id="volMute"> Stumm (Taste M)</label>
-    <div class="sndnow" id="sndNow">Keine Musik</div>
+  <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
+</div>
+<div class="menuov" id="menuOv" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+  <div class="menubox">
+    <div class="mtitle" id="menuTitle">Spielmenü</div>
+    <div class="mview" id="menuMain">
+      <button class="btn mbtn" id="mResume">Zurück zum Spiel</button>
+      <button class="btn mbtn" id="mSettings">Einstellungen</button>
+      <button class="btn mbtn" id="mChars">Charakter wechseln</button>
+      <button class="btn mbtn danger" id="mLeave">Welt verlassen</button>
+    </div>
+    <div class="mview" id="menuSettings" hidden>
+      <span class="mlbl">Ton</span>
+      <div class="field"><label for="volMusic">Musik</label><div><input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5"><span class="val" id="volMusicVal">50 %</span></div></div>
+      <div class="field"><label for="volAmb">Umgebung</label><div><input type="range" id="volAmb" min="0" max="1" step="0.05" value="0.5"><span class="val" id="volAmbVal">50 %</span></div></div>
+      <label class="check"><input type="checkbox" id="volMute"> Stumm (Taste M)</label>
+      <div class="sndnow" id="sndNow">Keine Musik</div>
+      <span class="mlbl">Steuerung</span>
+      <div class="field"><label for="setMouse">Maus</label><div><input type="range" id="setMouse" min="0.3" max="2.5" step="0.05" value="1"><span class="val" id="setMouseVal">1.00×</span></div></div>
+      <label class="check"><input type="checkbox" id="setInvert"> Kamera vertikal umkehren</label>
+      <span class="mlbl">Anzeige</span>
+      <label class="check"><input type="checkbox" id="setMinimap" checked> Minimap anzeigen</label>
+      <label class="check"><input type="checkbox" id="setKeys" checked> Steuerungshilfe anzeigen</label>
+      <label class="check"><input type="checkbox" id="setNames" checked> Namen über Mitspielern</label>
+      <button class="btn mbtn" id="mBack">Zurück</button>
+    </div>
   </div>
 </div>
 <div class="loadov" id="loadOv" hidden role="alertdialog" aria-live="polite" aria-labelledby="loadTitle">
@@ -201,7 +228,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 22:45</p>
+<p class="ver">v 03.11. 23:05</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -327,6 +354,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud keys" id="keys" aria-label="Steuerung" hidden>
   <button class="keyshead" id="keysToggle" aria-expanded="true">Steuerung</button>
   <kbd>Enter</kbd><span>Chat · /tanzen, /winken …</span>
+  <kbd>Esc</kbd><span>Menü &amp; Einstellungen</span>
   <kbd>M</kbd><span>Ton an/aus</span>
   <kbd>W / S</kbd><span>vor / rückwärts</span>
   <kbd>A / D</kbd><span>drehen</span>
@@ -582,6 +610,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type === 'text')); };
   addEventListener('keydown', e => {
     if (loadTasks.size) { e.preventDefault(); return; }
+    if (e.code === 'Escape' && mode === 'play' && !typing()) {
+      e.preventDefault();
+      if (!$('adminPanel').hidden) { $('adminPanel').hidden = true; return; }
+      toggleMenu(); return;
+    }
+    if (menuOpen) return;
     if (typing() || mode !== 'play') return;
     if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === '/') { e.preventDefault(); openChat(e.key === '/' ? '/' : ''); return; }
     if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
@@ -599,9 +633,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const joy = { id: null, x0: 0, y0: 0, dx: 0, dy: 0 };
 
   function look(dx, dy) {
-    if (rmb) facing -= dx * MOVE.mouse;      // Rechte Maustaste: Figur dreht mit
-    else camOff -= dx * MOVE.mouse;          // Linke Maustaste: nur Kamera
-    pitch = Math.min(1.4, Math.max(-0.4, pitch + dy * MOVE.mouse));
+    const ms = MOVE.mouse * (settings.mouse || 1);
+    if (rmb) facing -= dx * ms;      // Rechte Maustaste: Figur dreht mit
+    else camOff -= dx * ms;          // Linke Maustaste: nur Kamera
+    pitch = Math.min(1.4, Math.max(-0.4, pitch + dy * ms * (settings.invert ? -1 : 1)));
   }
   function mouseButtons(e) {
     if (mode !== 'play') { lmb = rmb = false; return; }
@@ -1136,11 +1171,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     audioStart();
-    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false; $('chat').hidden = false; $('minimap').hidden = false;
+    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
+    if (worldLeft) { worldLeft = false; autoJoin(); }
     renderNameBar(); renderParty();
     canvas.focus();
   }
   function enterSelect() {
+    closeMenu();
     mode = 'select'; keys.clear(); autorun = false; lmb = rmb = false;
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     resetPlayer();
@@ -1289,7 +1326,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (name !== R.name) {
       R.name = name;
       if (R.tag) { R.group.remove(R.tag); R.tag.material.map.dispose(); R.tag.material.dispose(); }
-      R.tag = nameTag(name); R.group.add(R.tag);
+      R.tag = nameTag(name); R.tag.visible = settings.names; R.group.add(R.tag);
     }
     const hue = Number.isFinite(pr.c) ? pr.c : 0;
     if (hue !== R.hue) { R.hue = hue; R.ph.children[0].material = R.ph.children[0].material.clone(); R.ph.children[0].material.color.setHSL(hue / 360, 0.55, 0.55); }
@@ -2273,7 +2310,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function applyVol() {
     if (AU.gM) { AU.gM.gain.setTargetAtTime(vol.mute ? 0 : vol.music * 0.8, AU.ctx.currentTime, 0.2); AU.gA.gain.setTargetAtTime(vol.mute ? 0 : vol.amb * 0.7, AU.ctx.currentTime, 0.2); }
     $('volMusic').value = vol.music; $('volAmb').value = vol.amb; $('volMute').checked = vol.mute;
-    $('sndBtn').classList.toggle('muted', vol.mute);
+    $('volMusicVal').textContent = Math.round(vol.music * 100) + ' %'; $('volAmbVal').textContent = Math.round(vol.amb * 100) + ' %';
   }
   function audioStart() {
     // Muss aus einem Klick heraus passieren (Browser-Regel), daher beim „Spielen"
@@ -2361,11 +2398,51 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('musicInput').onchange = e => { pickAudio('music', e.target.files); e.target.value = ''; };
   $('ambInput').onchange = e => { pickAudio('amb', e.target.files); e.target.value = ''; };
   $('audioClear').onclick = () => { if (!mapCfg) return; mapCfg.audio = null; AU.keyM = AU.keyA = undefined; setupAudio(); broadcastMap(); };
-  $('sndBtn').onclick = () => { const p = $('sndPanel'); p.hidden = !p.hidden; $('sndBtn').setAttribute('aria-expanded', String(!p.hidden)); };
   $('volMusic').oninput = e => { vol.music = +e.target.value; saveVol(); applyVol(); };
   $('volAmb').oninput = e => { vol.amb = +e.target.value; saveVol(); applyVol(); };
   $('volMute').onchange = e => { vol.mute = e.target.checked; saveVol(); applyVol(); };
   applyVol(); renderAudioAdmin();
+
+  // ---------- Spielmenü & Einstellungen ----------
+  let menuOpen = false, worldLeft = false;
+  const settings = { mouse: 1, invert: false, minimap: true, keys: true, names: true };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem('wf-settings') || '{}')); } catch (_) {}
+  function saveSettingsLocal() { try { localStorage.setItem('wf-settings', JSON.stringify(settings)); } catch (_) {} }
+  function renderSettings() {
+    $('setMouse').value = settings.mouse; $('setMouseVal').textContent = (+settings.mouse).toFixed(2) + '×';
+    $('setInvert').checked = settings.invert; $('setMinimap').checked = settings.minimap;
+    $('setKeys').checked = settings.keys; $('setNames').checked = settings.names;
+    applyVol();
+  }
+  function applyDisplay() {
+    if (mode === 'play') { $('minimap').hidden = !settings.minimap; $('keys').hidden = !settings.keys; }
+    for (const R of remotes.values()) if (R.tag) R.tag.visible = settings.names;
+  }
+  function openMenu() {
+    menuOpen = true; haltMovement(); sendState(true); closeChat();
+    $('menuMain').hidden = false; $('menuSettings').hidden = true; $('menuTitle').textContent = 'Spielmenü';
+    $('menuOv').hidden = false; $('mResume').focus();
+  }
+  function closeMenu() { menuOpen = false; $('menuOv').hidden = true; if (mode === 'play') canvas.focus({ preventScroll: true }); }
+  function toggleMenu() { menuOpen ? closeMenu() : openMenu(); }
+  $('mResume').onclick = closeMenu;
+  $('mSettings').onclick = () => { renderSettings(); $('menuMain').hidden = true; $('menuSettings').hidden = false; $('menuTitle').textContent = 'Einstellungen'; $('mBack').focus(); };
+  $('mBack').onclick = () => { $('menuMain').hidden = false; $('menuSettings').hidden = true; $('menuTitle').textContent = 'Spielmenü'; $('mSettings').focus(); };
+  $('mChars').onclick = () => { closeMenu(); enterSelect(); };
+  $('mLeave').onclick = () => {
+    closeMenu();
+    if (net.ready) netSend({ t: 'l', id: net.id });
+    netReset(); worldLeft = true;
+    netMsg('Welt verlassen. Mit „Spielen" trittst du wieder bei.', '');
+    enterSelect();
+  };
+  $('menuOv').addEventListener('mousedown', e => { if (e.target === $('menuOv')) closeMenu(); });
+  $('menuOv').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!$('menuSettings').hidden) $('mBack').click(); else closeMenu(); } });
+  $('setMouse').oninput = e => { settings.mouse = +e.target.value; $('setMouseVal').textContent = settings.mouse.toFixed(2) + '×'; saveSettingsLocal(); };
+  $('setInvert').onchange = e => { settings.invert = e.target.checked; saveSettingsLocal(); };
+  $('setMinimap').onchange = e => { settings.minimap = e.target.checked; saveSettingsLocal(); applyDisplay(); };
+  $('setKeys').onchange = e => { settings.keys = e.target.checked; saveSettingsLocal(); applyDisplay(); };
+  $('setNames').onchange = e => { settings.names = e.target.checked; saveSettingsLocal(); applyDisplay(); };
 
   // ---------- Ladebalken ----------
   const loadTasks = new Map(), waitTimers = new Map();
