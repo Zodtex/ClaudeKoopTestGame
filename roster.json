@@ -2,10 +2,40 @@
   "_hinweis": "Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.",
   "characters": [
     {
-      "name": "Tarecgosa",
-      "path": "creature/dragonwhelp/dragonwhelptarecgosa.m2",
+      "name": "Murloc",
+      "path": "creature/murloc/babymurloc.m2",
       "height": 1.4,
-      "alpha": true
+      "alpha": true,
+      "idle": "Stand (ID 0 variation 0)",
+      "walk": "Run (ID 5 variation 0)",
+      "back": null,
+      "sl": null,
+      "sr": null,
+      "jump": null
+    },
+    {
+      "name": "Moonkin",
+      "path": "creature/babymoonkin/babymoonkin_ne.m2",
+      "height": 1.4,
+      "alpha": false,
+      "idle": "Stand (ID 0 variation 0)",
+      "walk": "Run (ID 5 variation 0)",
+      "back": "Walkbackwards (ID 13 variation 0)",
+      "sl": "ShuffleLeft (ID 11 variation 0)",
+      "sr": "ShuffleRight (ID 12 variation 0)",
+      "jump": "JumpStart (ID 37 variation 0)"
+    },
+    {
+      "name": "Dragonwhelp",
+      "path": "creature/dragonwhelp/dragonwhelp.m2",
+      "height": 1.4,
+      "alpha": true,
+      "idle": "Stand (ID 0 variation 0)",
+      "walk": "Run (ID 5 variation 1)",
+      "back": null,
+      "sl": null,
+      "sr": null,
+      "jump": null
     }
   ]
 }
