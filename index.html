@@ -254,6 +254,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <select id="edChar" aria-label="Charakter"></select>
       <div id="adminEdit"></div>
       <button class="btn ghost" id="rosterExport">Dauerhaft speichern …</button>
+      <div class="netstate" id="pushState"></div>
       <div id="rosterOut" hidden>
         <p class="hint">Kopiere den Text, öffne roster.json auf GitHub, ersetze den Inhalt und klicke „Commit changes". Oder schick ihn Claude.</p>
         <textarea id="rosterJson" rows="8" readonly spellcheck="false" aria-label="roster.json"></textarea>
@@ -262,6 +263,15 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           <a class="btn ghost" id="rosterGh" href="https://github.com/Zodtex/ClaudeKoopTestGame/edit/main/roster.json" target="_blank" rel="noopener">Auf GitHub öffnen</a>
         </div>
       </div>
+    </div>
+    <div class="asec">
+      <span class="lbl">GitHub-Verbindung</span>
+      <p class="hint" id="ghHint">Mit einem GitHub-Token speichert „Dauerhaft speichern" direkt in dein Repository. Der Token bleibt nur in diesem Browser.</p>
+      <div class="joinrow" id="ghSetRow">
+        <input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off" spellcheck="false" aria-label="GitHub-Token">
+        <button class="btn ghost" id="ghSave">Merken</button>
+      </div>
+      <button class="btn ghost danger" id="ghForget" hidden>Token entfernen</button>
     </div>
     <button class="btn ghost danger" id="adminLogout">Admin auf diesem Gerät abmelden</button>
   </div>
@@ -1475,13 +1485,54 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const fs = $('modelSettings');
     if (isAdmin) $('adminEdit').append(fs); else $('panel').querySelector('.body').append(fs);
     $('editNote').hidden = !isAdmin;
-    renderEditor();
+    renderEditor(); renderGh();
   }
   $('adminBtn').onclick = () => { $('adminPanel').hidden = !$('adminPanel').hidden; };
   $('adminClose').onclick = () => { $('adminPanel').hidden = true; };
   $('emotePlay').onclick = playEmote;
   $('emoteStop').onclick = stopEmote;
-  $('rosterExport').onclick = () => { $('rosterJson').value = rosterJson(); $('rosterOut').hidden = false; };
+  // ---------- Direkt nach GitHub speichern (Token nur lokal beim Admin) ----------
+  const GH = { owner: 'Zodtex', repo: 'ClaudeKoopTestGame', path: 'roster.json', branch: 'main' };
+  const ghToken = () => { try { return localStorage.getItem('wf-gh-token') || ''; } catch (_) { return ''; } };
+  function renderGh() {
+    const has = !!ghToken();
+    $('ghSetRow').hidden = has; $('ghForget').hidden = !has;
+    $('ghHint').textContent = has ? 'Verbunden. „Dauerhaft speichern" schreibt roster.json direkt in dein Repository.' : 'Mit einem GitHub-Token speichert „Dauerhaft speichern" direkt in dein Repository. Der Token bleibt nur in diesem Browser.';
+  }
+  $('ghSave').onclick = () => {
+    const t = $('ghToken').value.trim(); if (!t) return;
+    try { localStorage.setItem('wf-gh-token', t); } catch (_) {}
+    $('ghToken').value = ''; renderGh();
+  };
+  $('ghForget').onclick = () => { try { localStorage.removeItem('wf-gh-token'); } catch (_) {} renderGh(); };
+  function pushMsg(t, k = '') { const e = $('pushState'); e.textContent = t; e.className = 'netstate ' + k; }
+  async function pushRoster(text) {
+    const tok = ghToken();
+    const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
+    const head = { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    pushMsg('Speichere auf GitHub …');
+    try {
+      const cur = await fetch(`${url}?ref=${GH.branch}`, { headers: head, cache: 'no-store' });
+      let sha;
+      if (cur.ok) sha = (await cur.json()).sha;
+      else if (cur.status !== 404) throw new Error(cur.status === 401 ? 'Token ungültig oder abgelaufen' : `GitHub antwortet ${cur.status}`);
+      const body = { message: 'Charaktere im Admin-Panel aktualisiert', content: btoa(unescape(encodeURIComponent(text + '\n'))), branch: GH.branch };
+      if (sha) body.sha = sha;
+      const put = await fetch(url, { method: 'PUT', headers: { ...head, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!put.ok) throw new Error(put.status === 403 || put.status === 404 ? 'Token darf nicht in dieses Repository schreiben' : `GitHub antwortet ${put.status}`);
+      overrides = {}; try { localStorage.removeItem('wf-roster-overrides'); } catch (_) {}
+      pushMsg('Gespeichert. Nach ein paar Minuten gilt es für alle, die die Seite neu laden.', 'ok');
+    } catch (e) {
+      pushMsg(`Speichern fehlgeschlagen: ${e.message}. Du kannst den Text unten manuell übernehmen.`, 'err');
+      $('rosterOut').hidden = false;
+    }
+  }
+  $('rosterExport').onclick = () => {
+    const text = rosterJson();
+    $('rosterJson').value = text;
+    if (ghToken()) { $('rosterOut').hidden = true; pushRoster(text); }
+    else $('rosterOut').hidden = false;
+  };
   $('rosterCopy').onclick = async () => {
     try { await navigator.clipboard.writeText($('rosterJson').value); $('rosterCopy').textContent = 'Kopiert'; }
     catch (_) { $('rosterJson').select(); $('rosterCopy').textContent = 'Markiert – Strg+C'; }
