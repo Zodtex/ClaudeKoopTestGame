@@ -174,7 +174,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <div class="mmzone" id="mmZone">Übungsfeld</div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
-<p class="ver">v 03.11. 20:30</p>
+<p class="ver">v 03.11. 20:45</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -328,6 +328,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         <button class="btn ghost danger" id="mapClear">Entfernen</button>
       </div>
       <button class="btn ghost" id="mapSpawn">Startpunkt hier setzen</button>
+      <label class="check"><input type="checkbox" id="hitboxToggle"> Hitboxen anzeigen (nur bei dir)</label>
       <input type="file" id="mapInput" webkitdirectory multiple hidden>
       <div class="netstate" id="mapState">Keine Karte. Es gilt das Übungsfeld.</div>
       <p class="hint">In wow.export unter „Maps" Kacheln markieren und als OBJ exportieren. Wähle dann deinen <b>obersten</b> Exportordner (der „maps" und „world" enthält), damit auch Bäume und Gebäude gefunden werden. Speichern für alle mit „Dauerhaft speichern".</p>
@@ -1807,7 +1808,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           o.position.set(MAX - px, py, MAX - pz);
           o.rotation.set((+r.RotationZ || 0) * D, ((+r.RotationY || 0) + 90) * D, -(+r.RotationX || 0) * D, 'YZX');
           const sc = +r.ScaleFactor; o.scale.setScalar(Number.isFinite(sc) && sc > 0 ? sc : 1);
-          o.userData.tpl = name;
+          o.userData.tpl = name; o.userData.path = String(r.ModelFile || '').replace(/\\/g, '/').toLowerCase();
           deco.add(o); placed++;
         }
       }
@@ -1819,7 +1820,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       group.updateMatrixWorld(true);
       mapIndex = buildIndex(terrain);
       mapPlaced = placed;
-      buildObstacles(deco, templates);
+      buildObstacles(deco);
       mapTop = box.max.y - box.min.y;
       propsGroup.visible = false; ground.visible = false;
       mapLoaded = true; applyEnv(); updateWater(); mapLoaded = false;
@@ -1840,7 +1841,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function unloadMap(restore = true) {
     if (mapGroup) { scene.remove(mapGroup); disposeModel(mapGroup); }
     mapUrls.forEach(URL.revokeObjectURL);
-    mapGroup = null; mapIndex = null; mapUrls = []; mapLoaded = false; obstacles = null;
+    mapGroup = null; mapIndex = null; mapUrls = []; mapLoaded = false; obstacles = null; showHitboxes();
     if (water) water.visible = false;
     if (restore) {
       propsGroup.visible = true; ground.visible = true;
@@ -1885,6 +1886,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     broadcastMap();
   };
   $('mapName').onchange = () => { if (mapCfg) { mapCfg.name = $('mapName').value.trim().slice(0, 40) || 'Karte'; broadcastMap(); } };
+  $('hitboxToggle').onchange = e => { hitboxesOn = e.target.checked; showHitboxes(); };
   $('mapSpawn').onclick = () => {
     if (!mapCfg || !mapLoaded) { mapMsg('Lade zuerst eine Karte.', 'err'); return; }
     if (mode !== 'play') { mapMsg('Geh ins Spiel und stell dich an die gewünschte Stelle.', 'err'); return; }
@@ -2027,40 +2029,69 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   // ---------- Kollision mit Bäumen und Objekten ----------
   // Pro Modell wird die Grundfläche am Boden gemessen (Stamm statt Krone), daraus ein runder Fuß.
   let obstacles = null;
-  function footprint(tpl) {
-    const v = new THREE.Vector3(); const pts = [];
-    let minY = Infinity, maxY = -Infinity;
-    tpl.updateMatrixWorld(true);
-    tpl.traverse(o => {
-      if (!o.isMesh) return;
-      const pos = o.geometry.attributes.position, step = Math.max(1, Math.floor(pos.count / 6000));
-      for (let i = 0; i < pos.count; i += step) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrix); pts.push(v.x, v.y, v.z); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
-    });
-    if (!pts.length) return null;
-    const h = maxY - minY, band = minY + Math.max(0.3, h * 0.12);
-    let cx = 0, cz = 0, n = 0;
-    for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] <= band) { cx += pts[i]; cz += pts[i + 2]; n++; }
-    if (!n) return null;
-    cx /= n; cz /= n;
-    let r = 0;
-    for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] <= band) r = Math.max(r, Math.hypot(pts[i] - cx, pts[i + 2] - cz));
-    return { cx, cz, minY, h, r: Math.min(r, 2.5) };
-  }
-  function buildObstacles(deco, templates) {
-    const fps = new Map();
-    for (const [name, tpl] of templates) if (tpl) fps.set(name, footprint(tpl));
-    const CELL = 8, cells = new Map(), list = [], v = new THREE.Vector3();
+  // Querschnitt jedes Objekts auf Körperhöhe (0,5–1,7 Yards über dem Boden): genau dort, wo die Figur anstößt.
+  // Dreiecke werden mit waagrechten Ebenen geschnitten, so passt der Kreis auch bei schiefen Palmen und groben Stämmen.
+  const NO_COLLIDE = /\/detail\/|fern|grass|bush|flower|weed|reed|lily|vine|moss|leaf|leaves|plant/;
+  function buildObstacles(deco) {
+    const CELL = 8, cells = new Map(), list = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), wp = new THREE.Vector3();
     deco.updateMatrixWorld(true);
     for (const o of deco.children) {
-      const fp = fps.get(o.userData.tpl); if (!fp) continue;
-      const sc = o.scale.x, h = fp.h * sc, r = fp.r * sc;
-      if (h < 0.6 || r < 0.12) continue; // Flaschen, Gras & Co. nicht
-      v.set(fp.cx, fp.minY, fp.cz); o.localToWorld(v);
-      const i = list.length; list.push({ x: v.x, z: v.z, y: v.y, top: v.y + h, r });
-      const x0 = Math.floor((v.x - r) / CELL), x1 = Math.floor((v.x + r) / CELL), z0 = Math.floor((v.z - r) / CELL), z1 = Math.floor((v.z + r) / CELL);
-      for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 100003 + z; let a = cells.get(k); if (!a) cells.set(k, a = []); a.push(i); }
+      if (NO_COLLIDE.test(o.userData.path || '')) continue;
+      o.getWorldPosition(wp);
+      const box = new THREE.Box3().setFromObject(o);
+      if (box.max.y - box.min.y < 0.6) continue;
+      const g = groundAt(wp.x, wp.z); const base = g === null ? box.min.y : Math.max(g, box.min.y);
+      const planes = [base + 0.5, base + 1.1, base + 1.7];
+      const pts = [];
+      o.traverse(m => {
+        if (!m.isMesh) return;
+        const pos = m.geometry.attributes.position, idx = m.geometry.index, mw = m.matrixWorld;
+        const n = idx ? idx.count : pos.count;
+        for (let i = 0; i < n; i += 3) {
+          a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mw);
+          b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(mw);
+          c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(mw);
+          const lo = Math.min(a.y, b.y, c.y), hi = Math.max(a.y, b.y, c.y);
+          for (const h of planes) {
+            if (h < lo || h > hi) continue;
+            for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+              if ((p.y - h) * (q.y - h) > 0 || p.y === q.y) continue;
+              const t = (h - p.y) / (q.y - p.y);
+              pts.push(p.x + (q.x - p.x) * t, p.z + (q.z - p.z) * t);
+            }
+          }
+        }
+      });
+      if (pts.length < 6) continue; // auf Körperhöhe nichts im Weg
+      let cx = 0, cz = 0; const n = pts.length / 2;
+      for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cz += pts[i + 1]; }
+      cx /= n; cz /= n;
+      const ds = []; for (let i = 0; i < pts.length; i += 2) ds.push(Math.hypot(pts[i] - cx, pts[i + 1] - cz));
+      ds.sort((x, y) => x - y);
+      let r = ds[Math.floor(ds.length * 0.85)];
+      if (r > 3) continue;  // breite Büsche/Kronen auf Körperhöhe: lieber durchlassen
+      r = Math.max(0.12, r);
+      const i = list.length; list.push({ x: cx, z: cz, y: base, top: box.max.y, r });
+      const x0 = Math.floor((cx - r) / CELL), x1 = Math.floor((cx + r) / CELL), z0 = Math.floor((cz - r) / CELL), z1 = Math.floor((cz + r) / CELL);
+      for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 100003 + z; let arr = cells.get(k); if (!arr) cells.set(k, arr = []); arr.push(i); }
     }
     obstacles = { CELL, cells, list };
+    showHitboxes();
+  }
+  // Admin-Hilfe: Hitboxen als halbdurchsichtige Säulen anzeigen
+  let hitboxGroup = null, hitboxesOn = false;
+  function showHitboxes() {
+    if (hitboxGroup) { scene.remove(hitboxGroup); hitboxGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); hitboxGroup = null; }
+    if (!hitboxesOn || !obstacles) return;
+    hitboxGroup = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff3b6b, transparent: true, opacity: 0.35, depthWrite: false });
+    for (const o of obstacles.list) {
+      const h = Math.min(4, o.top - o.y);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(o.r, o.r, h, 20, 1, true), mat);
+      m.position.set(o.x, o.y + h / 2, o.z); hitboxGroup.add(m);
+    }
+    scene.add(hitboxGroup);
   }
   function collideObstacles() {
     if (!obstacles) return;
