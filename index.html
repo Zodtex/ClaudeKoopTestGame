@@ -98,6 +98,15 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .actionbar.wowhl .ab-slot::after { content: ""; position: absolute; inset: 0; background: var(--hl-img) center / 100% 100% no-repeat; mix-blend-mode: screen; opacity: 0; pointer-events: none; z-index: 2; }
 .actionbar.wowhl .ab-slot:hover::after { opacity: 1; }
 .actionbar.wowhl .ab-slot:hover { border-color: inherit; }
+.cropbox { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; }
+#cropCanvas { width: 100%; height: auto; max-height: 220px; object-fit: contain; cursor: crosshair; border-radius: 4px; touch-action: none;
+  background: repeating-conic-gradient(#2a2f35 0 25%, #1c2025 0 50%) 0 0 / 16px 16px; }
+.croppieces { display: flex; gap: 6px; flex-wrap: wrap; }
+.croppieces button { min-width: 32px; padding: 4px 8px; font: 600 12px var(--f-mono); border-radius: 4px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.croppieces button.on { border-color: var(--gold); color: var(--gold); background: rgba(208,166,78,0.12); }
+.cropnums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cropnums label { display: flex; align-items: center; gap: 4px; font: 11px var(--f-mono); color: var(--muted); }
+.cropnums input { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 4px; font: 12px var(--f-mono); }
 .ab-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(10,12,22,0.94); border: 1px solid #9a8a5a; border-radius: 4px; padding: 6px 10px; font-size: 12.5px; color: #fff; pointer-events: none; }
 .ab-tip b { display: block; color: #ffd100; font-weight: 600; margin-bottom: 2px; }
 @media (max-width: 640px) {
@@ -301,7 +310,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 00:35</p>
+<p class="ver">v 04.11. 00:55</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -502,6 +511,25 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         <div><input type="range" id="uiSlotScale" min="1" max="2.2" step="0.05" value="1.8"><span class="val" id="uiSlotScaleVal">1.80×</span></div>
       </div>
       <div class="netstate" id="uiState">Eigene Zierleiste.</div>
+      <div class="cropbox" id="cropBox">
+        <div class="field">
+          <label for="cropKind">Ausschnitt für</label>
+          <select id="cropKind"><option value="bar">Leiste</option><option value="cap">Endkappe</option><option value="slot">Feld-Rahmen</option><option value="hl">Hover-Glanz</option></select>
+        </div>
+        <canvas id="cropCanvas" width="600" height="200" aria-label="Sammeldatei – Rahmen aufziehen"></canvas>
+        <div class="croppieces" id="cropPieces"></div>
+        <div class="cropnums">
+          <label>x <input type="number" id="cropX" min="0" step="1"></label>
+          <label>y <input type="number" id="cropY" min="0" step="1"></label>
+          <label>B <input type="number" id="cropW" min="1" step="1"></label>
+          <label>H <input type="number" id="cropH" min="1" step="1"></label>
+        </div>
+        <div class="btnrow">
+          <button class="btn ghost" id="cropAll">Ganzes Bild</button>
+          <button class="btn ghost" id="cropRetail">Retail-Leiste</button>
+        </div>
+        <p class="hint" id="cropHint">Zieh mit der Maus einen Rahmen um den Teil, den du willst. Besteht die Leiste aus mehreren Stücken, mit „+" weitere Ausschnitte anlegen – sie werden nebeneinandergesetzt.</p>
+      </div>
       <button class="btn ghost danger" id="uiClear">Zurück zur eigenen Leiste</button>
       <p class="hint">In wow.export im Tab „Textures" nach „mainmenubar" suchen (z. B. die Endkappe mit dem Greif) und als PNG exportieren. Die linke Kappe wird rechts automatisch gespiegelt. Für die Felder unter „buttons" z. B. „ui-quickslot2" (Rahmen) und „buttonhilight-square" (Glanz). In WoW ist der Rahmen größer als das Feld – mit „Rahmengröße" anpassen. Die Grafiken gehen wie Modelle nur an deine Mitspieler, nicht auf GitHub.</p>
     </div>
@@ -2573,44 +2601,61 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const cleanUi = u => {
     if (!u || typeof u !== 'object') return null;
     const k = v => typeof v === 'string' && v.startsWith('ui:') ? v.slice(0, 220) : null;
-    const o = { cap: k(u.cap), bar: k(u.bar), slot: k(u.slot), hl: k(u.hl), ss: Number.isFinite(+u.ss) ? Math.max(1, Math.min(2.2, +u.ss)) : 1.8 };
+    const o = { cap: k(u.cap), bar: k(u.bar), slot: k(u.slot), hl: k(u.hl), ss: Number.isFinite(+u.ss) ? Math.max(1, Math.min(2.2, +u.ss)) : 1.8, crop: {} };
+    if (u.crop && typeof u.crop === 'object') for (const kind of ['cap', 'bar', 'slot', 'hl']) {
+      const list = Array.isArray(u.crop[kind]) ? u.crop[kind] : [];
+      const clean = list.slice(0, 6).filter(r => Array.isArray(r) && r.length === 4 && r.every(n => Number.isFinite(n) && n >= 0 && n <= 8192) && r[2] >= 1 && r[3] >= 1).map(r => r.map(Math.round));
+      if (clean.length) o.crop[kind] = clean;
+    }
     return o.cap || o.bar || o.slot || o.hl ? o : null;
   };
   function setUiCfg(u, fromPeer) { uiCfg = cleanUi(u); applyUi(); }
-  async function applyUi() {
-    uiUrls.forEach(URL.revokeObjectURL); uiUrls = [];
+  // Sammeldateien: aus einem großen Bild einen oder mehrere Ausschnitte nehmen und nebeneinandersetzen
+  const cropsOf = kind => (uiCfg && uiCfg.crop && uiCfg.crop[kind]) || [];
+  async function imageUrl(file, rects) {
+    if (!rects || !rects.length) { const u = URL.createObjectURL(file); uiUrls.push(u); return u; }
+    const bmp = await createImageBitmap(file);
+    const W = rects.reduce((a, r) => a + r[2], 0), H = Math.max(...rects.map(r => r[3]));
+    const c = document.createElement('canvas'); c.width = Math.max(1, W); c.height = Math.max(1, H);
+    const g = c.getContext('2d'); let x = 0;
+    for (const r of rects) { g.drawImage(bmp, r[0], r[1], r[2], r[3], x, 0, r[2], H); x += r[2]; }
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    const u = URL.createObjectURL(blob); uiUrls.push(u); return u;
+  }
+  let uiBusy = Promise.resolve();
+  function applyUi() { uiBusy = uiBusy.then(applyUiNow, applyUiNow); return uiBusy; }
+  async function applyUiNow() {
+    const old = uiUrls; uiUrls = [];
     const bar = $('actionBar'), L = document.querySelector('.ab-cap.left'), R = document.querySelector('.ab-cap.right');
-    const fc = uiCfg && uiCfg.cap ? await sharedGet(uiCfg.cap) : null, fb = uiCfg && uiCfg.bar ? await sharedGet(uiCfg.bar) : null;
-    if (fc) uiHave.add(uiCfg.cap); if (fb) uiHave.add(uiCfg.bar);
-    if (fc && fc[0]) {
-      const u = URL.createObjectURL(fc[0]); uiUrls.push(u);
+    const get = async k => { const key = uiCfg && uiCfg[k]; if (!key) return null; const f = await sharedGet(key); if (f) uiHave.add(key); return f && f[0] ? f[0] : null; };
+    const fc = await get('cap'), fb = await get('bar'), fs = await get('slot'), fh = await get('hl');
+    if (fc) {
+      const u = await imageUrl(fc, cropsOf('cap'));
       L.innerHTML = R.innerHTML = ''; [L, R].forEach(el => { const i = new Image(); i.src = u; i.alt = ''; el.append(i); });
       bar.classList.add('wowui');
     } else { L.innerHTML = capSvg.L; R.innerHTML = capSvg.R; bar.classList.remove('wowui'); }
-    if (fb && fb[0]) {
-      const u = URL.createObjectURL(fb[0]); uiUrls.push(u);
-      bar.style.setProperty('--bar-img', `url("${u}")`); bar.classList.add('wowbar');
-    } else { bar.style.removeProperty('--bar-img'); bar.classList.remove('wowbar'); }
-    const fs = uiCfg && uiCfg.slot ? await sharedGet(uiCfg.slot) : null, fh = uiCfg && uiCfg.hl ? await sharedGet(uiCfg.hl) : null;
-    if (fs) uiHave.add(uiCfg.slot); if (fh) uiHave.add(uiCfg.hl);
-    const css = (cls, prop, files) => {
-      if (files && files[0]) { const u = URL.createObjectURL(files[0]); uiUrls.push(u); bar.style.setProperty(prop, `url("${u}")`); bar.classList.add(cls); }
+    const css = async (cls, prop, file, kind) => {
+      if (file) { bar.style.setProperty(prop, `url("${await imageUrl(file, cropsOf(kind))}")`); bar.classList.add(cls); }
       else { bar.style.removeProperty(prop); bar.classList.remove(cls); }
     };
-    css('wowslot', '--slot-img', fs); css('wowhl', '--hl-img', fh);
+    await css('wowbar', '--bar-img', fb, 'bar'); await css('wowslot', '--slot-img', fs, 'slot'); await css('wowhl', '--hl-img', fh, 'hl');
+    setTimeout(() => old.forEach(URL.revokeObjectURL), 1000);
     const ss = uiCfg ? uiCfg.ss : 1.8;
     bar.style.setProperty('--slot-scale', ss); $('uiSlotScale').value = ss; $('uiSlotScaleVal').textContent = (+ss).toFixed(2) + '×';
     const st = $('uiState');
-    const part = (key, have, label) => key ? (have ? label : label + ' wird übertragen …') : null;
-    const parts = uiCfg ? [part(uiCfg.cap, fc, 'Endkappe'), part(uiCfg.bar, fb, 'Leiste'), part(uiCfg.slot, fs, 'Feld-Rahmen'), part(uiCfg.hl, fh, 'Hover-Glanz')].filter(Boolean) : [];
+    const part = (k, have, label) => uiCfg && uiCfg[k] ? (have ? label + (cropsOf(k).length ? ' (Ausschnitt)' : '') : label + ' wird übertragen …') : null;
+    const parts = [part('cap', fc, 'Endkappe'), part('bar', fb, 'Leiste'), part('slot', fs, 'Feld-Rahmen'), part('hl', fh, 'Hover-Glanz')].filter(Boolean);
     st.textContent = parts.length ? 'Aktiv: ' + parts.join(' · ') : 'Eigene Zierleiste.';
     st.className = 'netstate' + (uiCfg ? ' ok' : '');
+    renderCropEditor();
   }
   async function pickUi(kind, list) {
     const f = [...list].find(x => /\.(png|jpe?g)$/i.test(x.name)); if (!f || !isAdmin) return;
     const key = `ui:${kind}:${base(f.name)}:${f.size}`;
     sharedPut(key, [f]); uiHave.add(key);
-    uiCfg = Object.assign({ cap: null, bar: null, slot: null, hl: null, ss: 1.8 }, uiCfg, { [kind]: key });
+    uiCfg = Object.assign({ cap: null, bar: null, slot: null, hl: null, ss: 1.8, crop: {} }, uiCfg, { [kind]: key });
+    if (uiCfg.crop) delete uiCfg.crop[kind]; // neues Bild: alter Ausschnitt passt nicht mehr
+    edKind = kind; edPiece = 0;
     await applyUi();
     if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg });
   }
@@ -2618,6 +2663,73 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('uiBarPick').onclick = () => $('uiBarInput').click();
   $('uiCapInput').onchange = e => { pickUi('cap', e.target.files); e.target.value = ''; };
   $('uiBarInput').onchange = e => { pickUi('bar', e.target.files); e.target.value = ''; };
+  // ---------- Ausschnitt-Editor ----------
+  let edKind = 'bar', edPiece = 0, edBmp = null, edBmpKey = null, edDrag = null, uiSendTimer = 0;
+  function uiChanged() { applyUi(); clearTimeout(uiSendTimer); uiSendTimer = setTimeout(() => { if (net.ready) netSend({ t: 'ui', id: net.id, ui: uiCfg }); }, 400); }
+  function setCrops(list) {
+    if (!uiCfg) return;
+    uiCfg.crop = uiCfg.crop || {};
+    if (list.length) uiCfg.crop[edKind] = list; else delete uiCfg.crop[edKind];
+    uiChanged();
+  }
+  async function renderCropEditor() {
+    $('cropKind').value = edKind;
+    const key = uiCfg && uiCfg[edKind];
+    const cv = $('cropCanvas'), g = cv.getContext('2d');
+    const dis = !key;
+    ['cropX', 'cropY', 'cropW', 'cropH', 'cropAll', 'cropRetail'].forEach(id => $(id).disabled = dis);
+    if (!key) { edBmp = null; edBmpKey = null; g.clearRect(0, 0, cv.width, cv.height); $('cropPieces').innerHTML = ''; $('cropHint').textContent = 'Erst oben eine Grafik für diesen Teil wählen.'; return; }
+    if (edBmpKey !== key) {
+      const f = await sharedGet(key); if (!f || !f[0]) return;
+      edBmp = await createImageBitmap(f[0]); edBmpKey = key;
+    }
+    $('cropHint').textContent = `Bild ${edBmp.width} × ${edBmp.height} px. Rahmen mit der Maus aufziehen; mit „+" weitere Stücke nebeneinandersetzen.`;
+    cv.width = edBmp.width; cv.height = edBmp.height;
+    g.clearRect(0, 0, cv.width, cv.height); g.drawImage(edBmp, 0, 0);
+    const crops = cropsOf(edKind), lw = Math.max(1, edBmp.width / 300);
+    crops.forEach((r, i) => {
+      g.lineWidth = lw * (i === edPiece ? 2.5 : 1.5); g.strokeStyle = i === edPiece ? '#ffd34d' : 'rgba(120,200,255,0.9)';
+      g.setLineDash(i === edPiece ? [] : [lw * 4, lw * 3]); g.strokeRect(r[0], r[1], r[2], r[3]);
+      g.fillStyle = i === edPiece ? '#ffd34d' : 'rgba(120,200,255,0.9)'; g.font = `${Math.round(12 * lw)}px sans-serif`; g.fillText(String(i + 1), r[0] + 3 * lw, r[1] + 13 * lw);
+    });
+    g.setLineDash([]);
+    // Stück-Knöpfe
+    const box = $('cropPieces'); box.innerHTML = '';
+    crops.forEach((r, i) => { const b = document.createElement('button'); b.textContent = i + 1; b.className = i === edPiece ? 'on' : ''; b.onclick = () => { edPiece = i; renderCropEditor(); }; box.append(b); });
+    const add = document.createElement('button'); add.textContent = '+'; add.title = 'Weiteres Stück'; add.disabled = crops.length >= 6;
+    add.onclick = () => { const l = cropsOf(edKind).slice(); l.push([0, 0, Math.min(64, edBmp.width), Math.min(64, edBmp.height)]); edPiece = l.length - 1; setCrops(l); };
+    box.append(add);
+    if (crops.length) { const del = document.createElement('button'); del.textContent = '−'; del.title = 'Dieses Stück entfernen'; del.onclick = () => { const l = cropsOf(edKind).slice(); l.splice(edPiece, 1); edPiece = Math.max(0, edPiece - 1); setCrops(l); }; box.append(del); }
+    const r = crops[edPiece];
+    [['cropX', 0], ['cropY', 1], ['cropW', 2], ['cropH', 3]].forEach(([id, i]) => { if (document.activeElement !== $(id)) $(id).value = r ? r[i] : ''; });
+  }
+  function canvasPt(e) {
+    const cv = $('cropCanvas'), rc = cv.getBoundingClientRect();
+    // object-fit: contain → tatsächliche Bildfläche im Element berechnen
+    const sc = Math.min(rc.width / cv.width, rc.height / cv.height), ox = (rc.width - cv.width * sc) / 2, oy = (rc.height - cv.height * sc) / 2;
+    return [Math.max(0, Math.min(cv.width, (e.clientX - rc.left - ox) / sc)), Math.max(0, Math.min(cv.height, (e.clientY - rc.top - oy) / sc))];
+  }
+  $('cropCanvas').addEventListener('pointerdown', e => {
+    if (!edBmp) return; e.preventDefault(); $('cropCanvas').setPointerCapture(e.pointerId);
+    edDrag = canvasPt(e);
+  });
+  $('cropCanvas').addEventListener('pointermove', e => {
+    if (!edDrag) return;
+    const [x, y] = canvasPt(e), r = [Math.round(Math.min(x, edDrag[0])), Math.round(Math.min(y, edDrag[1])), Math.max(1, Math.round(Math.abs(x - edDrag[0]))), Math.max(1, Math.round(Math.abs(y - edDrag[1])))];
+    const l = cropsOf(edKind).slice(); if (!l.length) edPiece = 0; l[edPiece] = r;
+    uiCfg.crop = uiCfg.crop || {}; uiCfg.crop[edKind] = l; renderCropEditor();
+  });
+  const endDrag = () => { if (edDrag) { edDrag = null; uiChanged(); } };
+  $('cropCanvas').addEventListener('pointerup', endDrag); $('cropCanvas').addEventListener('pointercancel', endDrag);
+  ['cropX', 'cropY', 'cropW', 'cropH'].forEach((id, i) => $(id).onchange = e => {
+    const l = cropsOf(edKind).slice(); const r = (l[edPiece] || [0, 0, edBmp ? edBmp.width : 1, edBmp ? edBmp.height : 1]).slice();
+    r[i] = Math.max(i >= 2 ? 1 : 0, Math.round(+e.target.value || 0)); l[edPiece] = r; setCrops(l);
+  });
+  $('cropKind').onchange = e => { edKind = e.target.value; edPiece = 0; renderCropEditor(); };
+  $('cropAll').onclick = () => { edPiece = 0; setCrops([]); };
+  // Ausschnitt der Retail-Sammeldatei „mainmenubar" (1024 × 256) laut Blizzard-Forum; ggf. anpassen
+  $('cropRetail').onclick = () => { edPiece = 0; setCrops([[114, 116, 804, 48]]); };
+  renderCropEditor();
   $('uiSlotPick').onclick = () => $('uiSlotInput').click();
   $('uiHlPick').onclick = () => $('uiHlInput').click();
   $('uiSlotInput').onchange = e => { pickUi('slot', e.target.files); e.target.value = ''; };
