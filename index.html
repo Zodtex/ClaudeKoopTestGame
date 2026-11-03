@@ -51,7 +51,7 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .chat.open .chatlog { background: rgba(10,13,17,0.45); border-radius: 4px; padding: 4px 6px; }
 #chatInput { pointer-events: auto; font: 13.5px var(--f-body); padding: 7px 9px; background: rgba(10,13,17,0.82); border: 1px solid rgba(208,166,78,0.55); color: #fff; border-radius: 4px; }
 /* Minimap oben rechts */
-.minimap { top: calc(64px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.minimap { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .minimap canvas { width: 170px; height: 170px; display: block; }
 .minimap .mmzone { font: 600 12px var(--f-display); letter-spacing: 0.08em; color: var(--gold); text-shadow: 0 1px 3px #000; max-width: 190px; text-align: center; }
 .minimap .mmzoom { position: absolute; right: -4px; bottom: 26px; display: flex; flex-direction: column; gap: 3px; }
@@ -173,6 +173,7 @@ input[type=text] { width: 100%; min-width: 0; background: #1b2229; color: var(--
   .panel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; max-height: 55%; }
   .keys { display: none; }
   .minimap canvas { width: 112px; height: 112px; }
+  .minimap { top: calc(78px + env(safe-area-inset-top, 0px)); }
   .minimap .mmzoom { bottom: 20px; }
   .chat { width: calc(100% - 32px); }
   .chatlog { max-height: 110px; font-size: 12.5px; }
@@ -234,7 +235,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 23:15</p>
+<p class="ver">v 03.11. 23:20</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -1177,7 +1178,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     audioStart();
-    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
+    $('selectPanel').hidden = true; $('panel').hidden = true; // Charakterwechsel jetzt im Esc-Menü $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
     if (worldLeft) { worldLeft = false; autoJoin(); }
     renderNameBar(); renderParty();
     canvas.focus();
