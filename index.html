@@ -174,7 +174,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <div class="mmzone" id="mmZone">Übungsfeld</div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
-<p class="ver">v 03.11. 20:45</p>
+<p class="ver">v 03.11. 21:00</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -2064,13 +2064,33 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         }
       });
       if (pts.length < 6) continue; // auf Körperhöhe nichts im Weg
-      let cx = 0, cz = 0; const n = pts.length / 2;
-      for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cz += pts[i + 1]; }
-      cx /= n; cz /= n;
-      const ds = []; for (let i = 0; i < pts.length; i += 2) ds.push(Math.hypot(pts[i] - cx, pts[i + 1] - cz));
-      ds.sort((x, y) => x - y);
-      let r = ds[Math.floor(ds.length * 0.85)];
-      if (r > 3) continue;  // breite Büsche/Kronen auf Körperhöhe: lieber durchlassen
+      // Stamm finden: Pro Richtung (24 Sektoren) den innersten Schnittpunkt nehmen. Blätter, Äste und Wurzeln
+      // liegen weiter außen und werden so ignoriert. Zweimal nachzentrieren, damit auch schiefe Stämme passen.
+      let cx = wp.x, cz = wp.z, r = 0, ok = false;
+      for (let it = 0; it < 3; it++) {
+        const SEC = 24, best = new Array(SEC).fill(Infinity), bx = new Array(SEC), bz = new Array(SEC);
+        for (let i = 0; i < pts.length; i += 2) {
+          const dx = pts[i] - cx, dz = pts[i + 1] - cz, d = Math.hypot(dx, dz);
+          if (d > 8) continue;
+          const k = Math.floor(((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI)) * SEC) % SEC;
+          if (d < best[k]) { best[k] = d; bx[k] = pts[i]; bz[k] = pts[i + 1]; }
+        }
+        const hit = []; for (let k = 0; k < SEC; k++) if (best[k] < Infinity) hit.push(k);
+        if (hit.length < 6) { ok = false; break; }
+        const ds = hit.map(k => best[k]).sort((x, y) => x - y);
+        r = ds[Math.floor(ds.length / 2)];
+        ok = true;
+        if (it < 2) { let sx = 0, sz = 0; for (const k of hit) { sx += bx[k]; sz += bz[k]; } cx = sx / hit.length; cz = sz / hit.length; }
+      }
+      if (!ok) {
+        // Zu wenig Richtungen getroffen (z. B. flaches Brett): Mittelpunkt und 85-%-Radius aller Punkte
+        cx = 0; cz = 0; const n = pts.length / 2;
+        for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cz += pts[i + 1]; }
+        cx /= n; cz /= n;
+        const ds = []; for (let i = 0; i < pts.length; i += 2) ds.push(Math.hypot(pts[i] - cx, pts[i + 1] - cz));
+        ds.sort((x, y) => x - y); r = ds[Math.floor(ds.length * 0.85)];
+      }
+      if (r > 5) continue;
       r = Math.max(0.12, r);
       const i = list.length; list.push({ x: cx, z: cz, y: base, top: box.max.y, r });
       const x0 = Math.floor((cx - r) / CELL), x1 = Math.floor((cx + r) / CELL), z0 = Math.floor((cz - r) / CELL), z1 = Math.floor((cz + r) / CELL);
