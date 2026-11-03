@@ -83,6 +83,19 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 .asec .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
 textarea { width: 100%; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font: 11px/1.45 var(--f-mono); resize: vertical; }
 a.btn { text-decoration: none; display: inline-block; }
+.namebar { top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; width: min(260px, calc(100% - 340px)); min-width: 180px; }
+.namebar .nb-lbl { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parch); text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+#playerName { text-align: center; font: 600 16px var(--f-display); letter-spacing: 0.06em; padding: 8px 10px; background: var(--panel); border: 1px solid rgba(208,166,78,0.55); color: var(--parch); }
+.nb-show { display: flex; flex-direction: column; align-items: center; background: var(--panel); border: 1px solid rgba(208,166,78,0.45); border-radius: 6px; padding: 6px 18px; min-width: 160px; }
+.nb-show b { font: 600 17px var(--f-display); letter-spacing: 0.08em; color: var(--gold); }
+.nb-show span { font-size: 11.5px; color: var(--muted); }
+.rrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.rrow .n { font-family: var(--f-display); color: var(--gold); }
+.rrow .ins { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rrow .ins input { font-size: 12.5px; padding: 5px 7px; }
+.rrow .ins input.path { font-family: var(--f-mono); font-size: 11px; }
+.rrow .st { font-size: 11px; color: var(--muted); }
+.rrow .st.ok { color: var(--ok); }
 .coop { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 .coop .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .joinrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
@@ -106,6 +119,7 @@ input[type=text] { width: 100%; min-width: 0; background: #1b2229; color: var(--
   .panel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; max-height: 55%; }
   .keys { display: none; }
   .party { top: calc(60px + env(safe-area-inset-top, 0px)); }
+  .namebar { left: auto; right: max(16px, env(safe-area-inset-right, 0px)); transform: none; width: 46%; min-width: 0; }
 }
 body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] { display: none !important; }
 </style>
@@ -121,27 +135,33 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
 <div class="hud party" id="party" aria-live="polite"></div>
 
+<div class="hud namebar" id="nameBar">
+  <label for="playerName" class="nb-lbl">Dein Name</label>
+  <input type="text" id="playerName" maxlength="20" placeholder="Name eingeben" autocomplete="off" spellcheck="false">
+  <div class="nb-show" id="nameShow" hidden><b id="nameShowName"></b><span id="nameShowChar"></span></div>
+</div>
+
 <aside class="hud panel" id="selectPanel">
   <header><h2>Charakterauswahl</h2></header>
   <div class="body">
     <div class="slots" id="slotList" role="listbox" aria-label="Charaktere"></div>
-    <div class="field">
+    <div class="field" hidden>
       <label for="slotName">Name</label>
       <input type="text" id="slotName" maxlength="24" autocomplete="off">
     </div>
-    <div class="btnrow">
+    <div class="btnrow" hidden>
       <button class="btn ghost" id="slotFolder">Ordner laden</button>
       <button class="btn ghost" id="slotFiles">Dateien laden</button>
     </div>
     <p class="hint" id="rosterInfo" hidden></p>
     <div class="status" id="selStatus">Lade gespeicherte Charaktere …</div>
-    <button class="btn ghost danger" id="slotClear">Platz leeren</button>
+    <button class="btn ghost danger" id="slotClear" hidden>Platz leeren</button>
     <div class="coop">
       <span class="lbl">Koop</span>
       <div class="btnrow">
         <button class="btn ghost" id="hostBtn">Spiel erstellen</button>
       </div>
-      <label class="check" id="fixRosterRow"><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
+      <label class="check" id="fixRosterRow" hidden><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
       <div class="joinrow">
         <input type="text" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Spielcode">
         <button class="btn ghost" id="joinBtn">Beitreten</button>
@@ -150,26 +170,26 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <div class="netstate" id="netState">Allein unterwegs.</div>
     </div>
     <button class="btn play" id="playBtn">Spielen</button>
-    <p class="hint">Koop: Einer klickt „Spiel erstellen" und schickt den Code, die anderen geben ihn ein und klicken „Beitreten". Modelle bleiben in diesem Browser gespeichert. Du lädst jeden Charakter nur einmal hoch; auf einem anderen Gerät oder im privaten Fenster sind die Plätze leer.</p>
+    <p class="hint">Koop: Einer klickt „Spiel erstellen" und schickt den Code, die anderen geben ihn ein und klicken „Beitreten". Fehlende Charaktere kommen dabei automatisch vom Admin.</p>
   </div>
 </aside>
 
 <aside class="hud panel" id="panel" hidden>
   <header>
-    <h2>Modell</h2>
+    <h2>Charakter</h2>
     <div class="btnrow">
       <button class="iconbtn" id="toSelect">Auswahl</button>
       <button class="iconbtn" id="togglePanel" aria-expanded="true">einklappen</button>
     </div>
   </header>
   <div class="body">
-    <div class="btnrow">
+    <div class="btnrow" hidden>
       <button class="btn" id="pickFiles">Dateien wählen</button>
       <button class="btn ghost" id="pickFolder">Ordner wählen</button>
     </div>
     <input type="file" id="fileInput" multiple hidden accept=".gltf,.glb,.obj,.mtl,.bin,.png,.jpg,.jpeg">
     <input type="file" id="folderInput" webkitdirectory multiple hidden>
-    <p class="hint">Exportiere in wow.export als <code>glTF</code> (mit Animationen) oder <code>OBJ</code>. Wähle dann die Modelldatei <em>zusammen mit</em> <code>.bin</code>/<code>.mtl</code> und den <code>.png</code>-Texturen – oder zieh alles auf das Spielfeld.</p>
+    <p class="hint" hidden>Exportiere in wow.export als <code>glTF</code> (mit Animationen) oder <code>OBJ</code>. Wähle dann die Modelldatei <em>zusammen mit</em> <code>.bin</code>/<code>.mtl</code> und den <code>.png</code>-Texturen – oder zieh alles auf das Spielfeld.</p>
     <div class="status" id="status">Platzhalter aktiv. Noch kein Modell geladen.</div>
 
     <fieldset id="modelSettings" disabled>
@@ -240,6 +260,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <button class="iconbtn" id="adminClose">schließen</button>
   </header>
   <div class="body">
+    <div class="asec">
+      <span class="lbl">Charakterliste</span>
+      <div id="rosterRows" class="slots"></div>
+      <button class="btn ghost" id="adminFolder">Exportordner wählen</button>
+      <p class="hint">Name und wow.export-Pfad eintragen (z. B. creature/dragonwhelp/dragonwhelptarecgosa.m2), dann deinen Exportordner wählen. Speichern für alle mit „Dauerhaft speichern".</p>
+    </div>
     <div class="asec">
       <span class="lbl">Animation abspielen</span>
       <select id="emoteSel" aria-label="Animation"><option value="">– Modell laden –</option></select>
@@ -619,6 +645,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     });
   }
   async function loadFiles(fileList, settings = null, persist = true) {
+    if (persist && !isAdmin) { status('Charaktere legt nur der Admin fest.', 'err'); return; }
     if (persist && rosterSource === 'repo') return importExportFolder(fileList);
     const files = [...fileList].filter(f => MODEL_EXT.test(f.name));
     if (!files.length) { status('Keine Modelldateien gefunden (.gltf, .glb, .obj, .bin, .mtl, .png).', 'err'); return; }
@@ -876,7 +903,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const has = slots[active] && slots[active].files && slots[active].files.length;
     $('slotClear').disabled = !slots[active];
     if (rosterMode) lockUI(true);
-    if (typeof renderEditor === 'function' && isAdmin) renderEditor();
+    if (typeof renderEditor === 'function' && isAdmin) { renderEditor(); renderRosterRows(); }
   }
 
   function showPlaceholder(msg) {
@@ -909,6 +936,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false;
+    renderNameBar(); renderParty();
     canvas.focus();
   }
   function enterSelect() {
@@ -916,7 +944,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     resetPlayer();
     $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true;
-    renderSlots();
+    renderSlots(); renderNameBar(); renderParty();
   }
 
   $('slotName').oninput = e => {
@@ -972,6 +1000,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const myHue = Math.floor(Math.random() * 360);
   const remotes = new Map();
   const myName = () => (slots[active] && slots[active].name) || `Charakter ${active + 1}`;
+  let playerName = '';
+  try { playerName = (localStorage.getItem('wf-name') || '').slice(0, 20); } catch (_) {}
+  const shownName = () => playerName || 'Abenteurer';
+  function renderNameBar() {
+    const play = mode === 'play';
+    $('playerName').hidden = play; document.querySelector('.nb-lbl').hidden = play;
+    $('nameShow').hidden = !play;
+    $('nameShowName').textContent = shownName();
+    $('nameShowChar').textContent = model || placeholder.visible ? myName() : '';
+  }
   const myKey = () => (model && slots[active] && slots[active].main) ? slots[active].main.toLowerCase() : null;
   const r2 = x => Math.round(x * 100) / 100;
 
@@ -1077,10 +1115,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       d.querySelector('span').textContent = label; d.querySelector('small').textContent = note;
       box.append(d);
     };
-    row(myHue, myName(), 'du');
+    row(myHue, shownName(), mode === 'play' ? `du · ${myName()}` : 'du');
     others.forEach(p => {
       const pr = p.presence || {};
-      row(Number.isFinite(pr.c) ? pr.c : 0, String(pr.n || 'Abenteurer').slice(0, 24), pr.m === 'play' ? (p.guest ? 'Gast' : '') : 'Auswahl');
+      row(Number.isFinite(pr.c) ? pr.c : 0, String(pr.n || 'Abenteurer').slice(0, 24), pr.m === 'play' ? String(pr.cn || '').slice(0, 24) : 'Auswahl');
     });
   }
 
@@ -1107,12 +1145,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     sendClock += dt; if (sendClock < 1 / 15) return; sendClock = 0;
     keepAlive += 1 / 15;
     const me = mode === 'play'
-      ? { m: 'play', n: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
+      ? { m: 'play', n: shownName(), cn: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
           em: emote,
           sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
           ...Object.fromEntries(ANIMS.map(a => [a.net, model ? clipName($(a.id)) : null])) }
-      : { m: 'select', n: myName(), c: myHue, p: null, mk: null };
+      : { m: 'select', n: shownName(), cn: myName(), c: myHue, p: null, mk: null };
     const json = JSON.stringify(me);
     if (json === lastSent && keepAlive < 2) return;
     lastSent = json; keepAlive = 0;
@@ -1362,28 +1400,30 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!r.ok) return null;
       const j = await r.json();
       const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
-      return list.length ? list : null;
+      return list;
     } catch (_) { return null; }
   }
   const stemOf = path => path.toLowerCase().replace(/\\/g, '/').replace(/\.(m2|wmo|gltf|glb|obj)$/, '');
+  async function buildRosterSlot(c) {
+    const stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
+    const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
+    if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
+    ANIM_KEYS.forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
+    if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
+    const sl = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
+    const files = await sharedGet(mk);
+    if (files) sl.files = files;
+    return sl;
+  }
   async function enterRepoRoster(list) {
     ownSlots = slots; rosterMode = true; rosterSource = 'repo';
     const next = [null, null, null];
-    for (let i = 0; i < list.length; i++) {
-      const c = list[i], stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
-      const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
-      if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
-      ANIM_KEYS.forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
-      if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
-      next[i] = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
-      const files = await sharedGet(mk);
-      if (files) next[i].files = files;
-    }
+    for (let i = 0; i < list.length; i++) next[i] = await buildRosterSlot(list[i]);
     slots = next;
     $('fixRosterRow').hidden = true;
     $('slotFolder').textContent = 'Exportordner wählen';
     const info = $('rosterInfo'); info.hidden = false;
-    info.textContent = 'Die Charaktere sind im Spiel vorgegeben. Fehlen sie dir, tritt einfach dem Spiel des Spielleiters bei: Er schickt sie dir automatisch. Oder exportiere sie selbst mit wow.export (glTF) und wähle deinen Exportordner.';
+    info.textContent = list.length ? 'Fehlt dir ein Charakter, tritt dem Spiel des Admins bei: Er schickt ihn dir automatisch.' : 'Der Admin hat noch keine Charaktere eingerichtet.';
   }
 
   // Sucht im Exportordner die Modelle der Liste samt .bin und Texturen
@@ -1450,6 +1490,49 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!sel.options.length) { sel.innerHTML = '<option value="">– noch kein Modell geladen –</option>'; sel.disabled = true; }
     else { sel.disabled = false; sel.value = String(active); }
   }
+  function renderRosterRows() {
+    const box = $('rosterRows');
+    if (box.contains(document.activeElement)) return; // nicht beim Tippen neu aufbauen
+    box.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const sl = slots[i];
+      const d = document.createElement('div'); d.className = 'rrow';
+      d.innerHTML = `<span class="n">${ROMAN[i]}</span><div class="ins"><input type="text" class="nm" maxlength="24" placeholder="Name" aria-label="Name ${ROMAN[i]}"><input type="text" class="path" placeholder="creature/…/modell.m2" spellcheck="false" aria-label="Pfad ${ROMAN[i]}"><span class="st"></span></div><button class="iconbtn" title="Platz leeren" aria-label="Platz ${ROMAN[i]} leeren">✕</button>`;
+      const nm = d.querySelector('.nm'), pa = d.querySelector('.path'), st = d.querySelector('.st');
+      nm.id = 'rosterName' + i; pa.id = 'rosterPath' + i;
+      nm.value = (sl && sl.name) || ''; pa.value = (sl && sl.path) || '';
+      const has = sl && sl.files && sl.files.length;
+      st.textContent = !sl || !sl.mk ? 'leer' : has ? 'Modell vorhanden' : 'Modell fehlt · Exportordner wählen';
+      if (has) st.classList.add('ok');
+      nm.onchange = () => {
+        const v = nm.value.trim().slice(0, 24);
+        if (slots[i]) slots[i].name = v; else if (v) slots[i] = { name: v, files: [] };
+        renderSlots();
+      };
+      pa.onchange = async () => {
+        const path = pa.value.trim();
+        if (!path) { slots[i] = slots[i] && slots[i].name ? { name: slots[i].name, files: [] } : null; }
+        else {
+          const prev = slots[i];
+          const next = await buildRosterSlot({ name: nm.value.trim() || undefined, path });
+          if (prev && prev.mk === next.mk && prev.settings) next.settings = prev.settings;
+          slots[i] = next;
+        }
+        renderSlots();
+        if (i === active) activateSlot(i);
+        else if (!model) activateSlot(i);
+      };
+      d.querySelector('button').onclick = () => { slots[i] = null; renderSlots(); if (i === active) activateSlot(Math.max(0, slots.findIndex(x => x && x.files && x.files.length))); };
+      box.append(d);
+    }
+  }
+  $('adminFolder').onclick = () => $('folderInput').click();
+  $('playerName').value = playerName;
+  $('playerName').oninput = e => {
+    playerName = e.target.value.trim().slice(0, 20);
+    try { localStorage.setItem('wf-name', playerName); } catch (_) {}
+    renderParty();
+  };
   $('edChar').onchange = e => { if (e.target.value !== '') activateSlot(+e.target.value); };
   function applyCfg(mk, set) {
     if (typeof mk !== 'string' || !set || typeof set !== 'object') return;
@@ -1485,7 +1568,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const fs = $('modelSettings');
     if (isAdmin) $('adminEdit').append(fs); else $('panel').querySelector('.body').append(fs);
     $('editNote').hidden = !isAdmin;
-    renderEditor(); renderGh();
+    renderEditor(); renderGh(); renderRosterRows();
   }
   $('adminBtn').onclick = () => { $('adminPanel').hidden = !$('adminPanel').hidden; };
   $('adminClose').onclick = () => { $('adminPanel').hidden = true; };
@@ -1548,8 +1631,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     showAdmin();
     db = await openDB();
     slots = await dbLoad();
-    repoRoster = await fetchRoster();
-    if (repoRoster) await enterRepoRoster(repoRoster);
+    repoRoster = (await fetchRoster()) || [];
+    await enterRepoRoster(repoRoster); // Charaktere legt nur der Admin fest
     const first = slots.findIndex(sl => sl && sl.files && sl.files.length);
     enterSelect();
     activateSlot(first >= 0 ? first : 0);
