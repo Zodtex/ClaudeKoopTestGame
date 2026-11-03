@@ -51,7 +51,7 @@
     ],
     "water": {
       "on": true,
-      "level": 37.6,
+      "level": 38,
       "block": true
     },
     "env": {
@@ -68,10 +68,20 @@
     }
   },
   "ui": {
-    "cap": null,
-    "bar": null,
+    "cap": "ui:cap:ui-mainmenubar-endcap-human.png:12143",
+    "bar": "ui:bar:mainmenubar.png:212369",
     "slot": "ui:slot:ui-quickslot2.png:575",
     "hl": "ui:hl:buttonhilight-square.png:1132",
-    "ss": 1.8
+    "ss": 1.7,
+    "crop": {
+      "bar": [
+        [
+          30,
+          0,
+          263,
+          55
+        ]
+      ]
+    }
   }
 }
