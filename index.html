@@ -134,7 +134,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud brand">
   <h1>Wanderfeld</h1>
   <p id="coords">x 0.0 · z 0.0</p>
-  <p class="ver">Version 03.11. 17:15</p>
+  <p class="ver">Version 03.11. 17:20</p>
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
@@ -1539,7 +1539,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         if (i === active) activateSlot(i);
         else if (!model) activateSlot(i);
       };
-      d.querySelector('button').onclick = () => { slots[i] = null; renderSlots(); if (i === active) activateSlot(Math.max(0, slots.findIndex(x => x && x.files && x.files.length))); };
+      d.querySelector('button').onclick = () => { nm.value = ''; pa.value = ''; slots[i] = null; renderSlots(); if (i === active) activateSlot(Math.max(0, slots.findIndex(x => x && x.files && x.files.length))); };
       box.append(d);
     }
   }
