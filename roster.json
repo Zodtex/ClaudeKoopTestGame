@@ -1,5 +1,5 @@
 {
-  "_hinweis": "Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.",
+  "_hinweis": "Nur Pfade und Einstellungen. Modelle und Karte kommen aus der eigenen WoW-Installation bzw. vom Admin.",
   "characters": [
     {
       "name": "Murloc",
@@ -37,5 +37,14 @@
       "sr": null,
       "jump": null
     }
-  ]
+  ],
+  "map": {
+    "name": "Karte",
+    "key": "map:adt_32_59",
+    "spawn": [
+      96.44,
+      -36.08,
+      -1.46
+    ]
+  }
 }
