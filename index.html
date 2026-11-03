@@ -1008,6 +1008,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function netReceive(msg, conn) {
     if (!msg || typeof msg !== 'object' || typeof msg.id !== 'string' || msg.id === net.id || msg.id.length > 20) return;
+    if (net.host && conn && msg.t !== 'f') { if (!connIds.has(conn)) connIds.set(conn, new Set()); connIds.get(conn).add(msg.id); }
     if (msg.t === 's' && msg.st && typeof msg.st === 'object') {
       const prev = netStates.get(msg.id);
       netStates.set(msg.id, msg.st); netSeen.set(msg.id, performance.now());
@@ -1036,6 +1037,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function netSendTo(id, msg, except) {
     if (!net.host) { netSend(msg); return; }
     for (const [c, ids] of connIds) if (ids.has(id) && c !== except && c.open) { try { c.send(msg); } catch (_) {} return; }
+    netSend(msg, except); // Empfänger noch unbekannt: an alle, die anderen ignorieren es
   }
   function sharedGet(key) {
     return new Promise(res => {
@@ -1052,13 +1054,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const tag = fromId + '|' + key;
     if (!net.ready || !key || requested.has(tag)) return;
     requested.add(tag);
-    setTimeout(() => requested.delete(tag), 30000); // nach 30 s darf erneut gefragt werden
+    setTimeout(() => requested.delete(tag), 8000); // nach 8 s darf erneut gefragt werden
     netSendTo(fromId, { t: 'req', id: net.id, to: fromId, mk: key });
   }
   async function sendMyModel(toId, key) {
-    const sl = slots.find(x => x && x.main && x.main.toLowerCase() === key && x.files && x.files.length);
+    const has = x => x && x.main && x.main.toLowerCase() === key && x.files && x.files.length;
+    let sl = slots.find(has) || (ownSlots || []).find(has);
+    if (!sl) { const cached = await sharedGet(key); if (cached) sl = { name: key, files: cached }; }
     if (!sl) return;
     const files = sl.files.filter(f => MODEL_EXT.test(f.name));
+    netMsg(`Sende ${sl.name || key} an einen Mitspieler …`, 'ok');
     let total = 0;
     for (let i = 0; i < files.length; i++) {
       const buf = await files[i].arrayBuffer();
@@ -1073,11 +1078,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     let inc = incoming.get(m.mk);
     if (!inc || inc.n !== m.n) { inc = { n: m.n, files: new Array(m.n), got: 0, size: 0 }; incoming.set(m.mk, inc); }
     if (inc.files[m.i]) return;
+    status(`Empfange ${m.mk} … ${inc.got + 1}/${inc.n} Dateien`);
     inc.size += m.buf.byteLength; if (inc.size > MAX_SHARE) { incoming.delete(m.mk); return; }
     inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
     if (inc.got < inc.n) return;
     incoming.delete(m.mk);
     sharedPut(m.mk, inc.files);
+    status(`${m.mk} empfangen und gespeichert.`, 'ok');
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
     if (rosterMode) {
       slots.forEach(sl => { if (sl && sl.mk === m.mk) sl.files = inc.files; });
@@ -1140,7 +1147,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     conn.on('open', () => {
       net.conns.add(conn); net.ready = true; lastSent = '';
       if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() }); } // Neuankömmling bekommt alle bekannten Stände
-      else netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok');
+      else { netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok'); if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); } }
       if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
     });
