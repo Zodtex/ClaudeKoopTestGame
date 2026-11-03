@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wanderfeld Koop</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: full-bleed 3D canvas, floating HUD — title top-left, import panel right, controls bottom-left */
+:root {
+  --night: #12171d;
+  --panel: rgba(17, 22, 28, 0.88);
+  --parch: #e9dfc6;
+  --muted: #98a1aa;
+  --gold: #d0a64e;
+  --line: rgba(233, 223, 198, 0.16);
+  --ok: #8fc37a;
+  --err: #e07a64;
+  --f-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--night); color: var(--parch); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+.hud { position: fixed; z-index: 2; }
+.brand { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 22px; letter-spacing: 0.08em; color: var(--parch); text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.brand p { margin: 2px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+
+.panel { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 290px; max-height: calc(100% - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(6px); display: flex; flex-direction: column; }
+.panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.panel h2 { margin: 0; font-family: var(--f-display); font-size: 13px; letter-spacing: 0.12em; color: var(--gold); }
+.panel .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 14px; }
+.panel.collapsed .body { display: none; }
+.iconbtn { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 4px; font: 12px var(--f-mono); padding: 2px 8px; cursor: pointer; }
+.iconbtn:hover { color: var(--parch); }
+
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { flex: 1 1 auto; background: rgba(208,166,78,0.12); color: var(--parch); border: 1px solid rgba(208,166,78,0.5); border-radius: 4px; padding: 8px 10px; font: 600 13px var(--f-body); cursor: pointer; text-align: center; }
+.btn:hover { background: rgba(208,166,78,0.22); }
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--muted); font-weight: 400; }
+.btn.ghost:hover { color: var(--parch); }
+.btn:focus-visible, .iconbtn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.hint { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.hint code { font-family: var(--f-mono); font-size: 11.5px; color: var(--parch); }
+.status { font-family: var(--f-mono); font-size: 11.5px; line-height: 1.5; color: var(--muted); padding: 8px 10px; border: 1px dashed var(--line); border-radius: 4px; word-break: break-word; }
+.status.ok { color: var(--ok); border-color: rgba(143,195,122,.4); }
+.status.err { color: var(--err); border-color: rgba(224,122,100,.45); }
+
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+fieldset[disabled] { opacity: 0.4; }
+legend { padding: 0; margin-bottom: 8px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.field { display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 8px; }
+.field label { font-size: 12.5px; color: var(--muted); }
+.field .val { font-family: var(--f-mono); font-size: 11px; color: var(--parch); }
+input[type=range] { width: 100%; accent-color: var(--gold); }
+select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; font: 12.5px var(--f-body); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.check input { accent-color: var(--gold); }
+
+.keys { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
+  display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.keys kbd { font-family: var(--f-mono); font-size: 11px; color: var(--parch); }
+
+.drop { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(10,13,17,0.72); border: 2px dashed var(--gold); font-family: var(--f-display); font-size: 22px; letter-spacing: 0.08em; color: var(--gold); pointer-events: none; }
+
+.party { top: calc(66px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); min-width: 170px; max-width: min(260px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.party .ttl { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+.party .ttl .dot { font-family: var(--f-mono); letter-spacing: 0; text-transform: none; }
+.party .mem { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.party .mem i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.party .mem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.party .mem small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 10.5px; flex: none; }
+.coop { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.coop .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.joinrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+#joinCode { text-transform: uppercase; font-family: var(--f-mono); letter-spacing: 0.2em; }
+.codebox { font-family: var(--f-mono); font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.codebox b { color: var(--gold); font-size: 18px; letter-spacing: 0.2em; user-select: all; }
+.netstate { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.netstate.ok { color: var(--ok); } .netstate.err { color: var(--err); }
+.slots { display: flex; flex-direction: column; gap: 6px; }
+.slot { display: grid; grid-template-columns: 26px 1fr; gap: 2px 10px; align-items: baseline; width: 100%; text-align: left; background: transparent; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; cursor: pointer; font: inherit; }
+.slot:hover { border-color: rgba(208,166,78,0.45); }
+.slot[aria-selected="true"] { border-color: var(--gold); background: rgba(208,166,78,0.12); }
+.slot .n { grid-row: span 2; font-family: var(--f-display); font-size: 18px; color: var(--gold); }
+.slot .nm { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.slot .meta { font-family: var(--f-mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+input[type=text] { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font: 13px var(--f-body); }
+.btn.play { font-family: var(--f-display); font-size: 15px; letter-spacing: 0.1em; padding: 11px; background: rgba(208,166,78,0.28); border-color: var(--gold); }
+.btn.play:hover { background: rgba(208,166,78,0.4); }
+.btn.danger { color: var(--err); border-color: rgba(224,122,100,0.4); }
+@media (max-width: 640px) {
+  .panel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; max-height: 55%; }
+  .keys { display: none; }
+  .party { top: calc(60px + env(safe-area-inset-top, 0px)); }
+}
+body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<canvas id="scene" tabindex="0" aria-label="3D-Spielfeld"></canvas>
+
+<div class="hud brand">
+  <h1>Wanderfeld</h1>
+  <p id="coords">x 0.0 · z 0.0</p>
+</div>
+
+<div class="hud party" id="party" aria-live="polite"></div>
+
+<aside class="hud panel" id="selectPanel">
+  <header><h2>Charakterauswahl</h2></header>
+  <div class="body">
+    <div class="slots" id="slotList" role="listbox" aria-label="Charaktere"></div>
+    <div class="field">
+      <label for="slotName">Name</label>
+      <input type="text" id="slotName" maxlength="24" autocomplete="off">
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="slotFolder">Ordner laden</button>
+      <button class="btn ghost" id="slotFiles">Dateien laden</button>
+    </div>
+    <div class="status" id="selStatus">Lade gespeicherte Charaktere …</div>
+    <button class="btn ghost danger" id="slotClear">Platz leeren</button>
+    <div class="coop">
+      <span class="lbl">Koop</span>
+      <div class="btnrow">
+        <button class="btn ghost" id="hostBtn">Spiel erstellen</button>
+      </div>
+      <div class="joinrow">
+        <input type="text" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Spielcode">
+        <button class="btn ghost" id="joinBtn">Beitreten</button>
+      </div>
+      <div class="codebox" id="codeBox" hidden>Code: <b id="codeVal"></b> <button class="iconbtn" id="copyCode">kopieren</button></div>
+      <div class="netstate" id="netState">Allein unterwegs.</div>
+    </div>
+    <button class="btn play" id="playBtn">Spielen</button>
+    <p class="hint">Koop: Einer klickt „Spiel erstellen" und schickt den Code, die anderen geben ihn ein und klicken „Beitreten". Modelle bleiben in diesem Browser gespeichert. Du lädst jeden Charakter nur einmal hoch; auf einem anderen Gerät oder im privaten Fenster sind die Plätze leer.</p>
+  </div>
+</aside>
+
+<aside class="hud panel" id="panel" hidden>
+  <header>
+    <h2>Modell</h2>
+    <div class="btnrow">
+      <button class="iconbtn" id="toSelect">Auswahl</button>
+      <button class="iconbtn" id="togglePanel" aria-expanded="true">einklappen</button>
+    </div>
+  </header>
+  <div class="body">
+    <div class="btnrow">
+      <button class="btn" id="pickFiles">Dateien wählen</button>
+      <button class="btn ghost" id="pickFolder">Ordner wählen</button>
+    </div>
+    <input type="file" id="fileInput" multiple hidden accept=".gltf,.glb,.obj,.mtl,.bin,.png,.jpg,.jpeg">
+    <input type="file" id="folderInput" webkitdirectory multiple hidden>
+    <p class="hint">Exportiere in wow.export als <code>glTF</code> (mit Animationen) oder <code>OBJ</code>. Wähle dann die Modelldatei <em>zusammen mit</em> <code>.bin</code>/<code>.mtl</code> und den <code>.png</code>-Texturen – oder zieh alles auf das Spielfeld.</p>
+    <div class="status" id="status">Platzhalter aktiv. Noch kein Modell geladen.</div>
+
+    <fieldset id="modelSettings" disabled>
+      <legend>Anpassen</legend>
+      <div class="field">
+        <label for="height">Größe</label>
+        <div><input type="range" id="height" min="0.5" max="8" step="0.1" value="2"><span class="val" id="heightVal">2.0 m</span></div>
+      </div>
+      <div class="field">
+        <label>Blickrichtung</label>
+        <div class="btnrow">
+          <button class="btn ghost" id="rotL" title="90° nach links">⟲ 90°</button>
+          <button class="btn ghost" id="rotR" title="90° nach rechts">⟳ 90°</button>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="alpha"> Alpha-Cutout (für Haare, Blätter, Umhänge)</label>
+      <div class="field">
+        <label for="animIdle">Stehen</label>
+        <select id="animIdle"><option value="">– keine –</option></select>
+      </div>
+      <div class="field">
+        <label for="animWalk">Laufen</label>
+        <select id="animWalk"><option value="">– keine –</option></select>
+      </div>
+      <div class="field">
+        <label for="animBack">Rückwärts</label>
+        <select id="animBack"><option value="">– keine –</option></select>
+      </div>
+      <button class="btn ghost danger" id="resetModel">Modell entfernen</button>
+    </fieldset>
+  </div>
+</aside>
+
+<div class="hud keys" id="keys" aria-label="Steuerung" hidden>
+  <kbd>W / S</kbd><span>vor / rückwärts</span>
+  <kbd>A / D</kbd><span>drehen</span>
+  <kbd>Q / E</kbd><span>seitwärts</span>
+  <kbd>Linke Maus</kbd><span>Kamera umsehen</span>
+  <kbd>Rechte Maus</kbd><span>Figur lenken, A/D strafen</span>
+  <kbd>Beide Tasten</kbd><span>vorwärts laufen</span>
+  <kbd>Num / R</kbd><span>Autolauf</span>
+  <kbd>Leertaste</kbd><span>springen</span>
+</div>
+
+<div class="drop" id="drop" hidden>Dateien hier ablegen</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/MTLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  // ---------- Renderer & Szene ----------
+  const canvas = $('scene');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  const SKY = 0x9db4c4;
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, 40, 140);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
+
+  scene.add(new THREE.HemisphereLight(0xdfe9f2, 0x4a5a3a, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff1d6, 1.1);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -25, right: 25, top: 25, bottom: -25, near: 1, far: 120 });
+  sun.shadow.bias = -0.0005;
+  scene.add(sun, sun.target);
+
+  // ---------- Boden ----------
+  const SIZE = 200, HALF = SIZE / 2 - 1;
+  function groundTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#5f7a44'; g.fillRect(0, 0, 256, 256);
+    let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 2600; i++) {
+      const l = 30 + rnd() * 18;
+      g.fillStyle = `hsl(${85 + rnd() * 20}, ${30 + rnd() * 15}%, ${l}%)`;
+      g.fillRect(rnd() * 256, rnd() * 256, 2 + rnd() * 3, 2 + rnd() * 3);
+    }
+    g.strokeStyle = 'rgba(30,40,20,0.35)'; g.lineWidth = 2; g.strokeRect(0, 0, 256, 256);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(SIZE / 4, SIZE / 4);
+    t.encoding = THREE.sRGBEncoding; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  }
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), new THREE.MeshLambertMaterial({ map: groundTexture() }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Orientierungspunkte: Steine und Säulen
+  (function props() {
+    let s = 42; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const stone = new THREE.MeshLambertMaterial({ color: 0x8a8578 });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x6b675e });
+    for (let i = 0; i < 70; i++) {
+      const r = 0.4 + rnd() * 1.6;
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rnd() > 0.5 ? stone : dark);
+      const a = rnd() * Math.PI * 2, d = 8 + rnd() * 85;
+      m.position.set(Math.cos(a) * d, r * 0.45, Math.sin(a) * d);
+      m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+      m.scale.y = 0.6 + rnd() * 0.5;
+      m.castShadow = m.receiveShadow = true; scene.add(m);
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 5 + (i % 3) * 1.5, 8), stone);
+      p.position.set(Math.cos(a) * 16, p.geometry.parameters.height / 2, Math.sin(a) * 16);
+      p.castShadow = p.receiveShadow = true; scene.add(p);
+    }
+  })();
+
+  // ---------- Spieler ----------
+  const player = new THREE.Group();
+  scene.add(player);
+  const leanGroup = new THREE.Group(); // dreht die Figur beim Strafen seitlich
+  player.add(leanGroup);
+  const pivot = new THREE.Group(); // trägt das Modell, dreht/skaliert es
+  leanGroup.add(pivot);
+
+  function makePlaceholder() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.1, 6, 16), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.6 }));
+    body.position.y = 0.95; body.castShadow = true;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.4, 12), new THREE.MeshStandardMaterial({ color: 0x3b2f1a }));
+    nose.rotation.x = Math.PI / 2; nose.position.set(0, 1.45, 0.45); nose.castShadow = true;
+    g.add(body, nose);
+    return g;
+  }
+  let placeholder = makePlaceholder();
+  leanGroup.add(placeholder);
+
+  let model = null, modelHeight = 2, rotOffset = -Math.PI / 2;
+  let mixer = null, clips = [], actIdle = null, actWalk = null, actBack = null, current = null;
+  let blobURLs = [];
+
+  // ---------- Steuerung (WoW-Stil) ----------
+  // Werte in Yards wie im Original: Laufen 7 y/s, Rückwärts 4,5 y/s, Drehen 180°/s, Sprung ~1,6 y hoch
+  const MOVE = { run: 7, back: 4.5, turn: Math.PI, jumpV: 7.96, g: 19.29, mouse: 0.005 };
+  const keys = new Set();
+  let autorun = false;
+  let mode = 'select', previewAng = 0;
+  const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type === 'text')); };
+  addEventListener('keydown', e => {
+    if (typing() || mode !== 'play') return;
+    if (e.code === 'NumLock' || e.code === 'KeyR') { if (!e.repeat) autorun = !autorun; }
+    if (e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'ArrowUp' || e.code === 'ArrowDown') autorun = false;
+    keys.add(e.code);
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  });
+  addEventListener('keyup', e => keys.delete(e.code));
+  addEventListener('blur', () => { keys.clear(); lmb = rmb = false; });
+
+  let facing = 0, camOff = 0, pitch = 0.3, dist = 8;
+  let lmb = false, rmb = false;
+  const touches = new Map();
+  const joy = { id: null, x0: 0, y0: 0, dx: 0, dy: 0 };
+
+  function look(dx, dy) {
+    if (rmb) facing -= dx * MOVE.mouse;      // Rechte Maustaste: Figur dreht mit
+    else camOff -= dx * MOVE.mouse;          // Linke Maustaste: nur Kamera
+    pitch = Math.min(1.4, Math.max(-0.4, pitch + dy * MOVE.mouse));
+  }
+  function mouseButtons(e) {
+    if (mode !== 'play') { lmb = rmb = false; return; }
+    const nl = !!(e.buttons & 1), nr = !!(e.buttons & 2);
+    if (nr && !rmb) { facing += camOff; camOff = 0; } // Rechtsklick: Figur schaut sofort in Kamerarichtung
+    lmb = nl; rmb = nr;
+    if ((lmb || rmb) && document.pointerLockElement !== canvas) {
+      try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {}
+    }
+    if (!lmb && !rmb && document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    canvas.focus();
+    if (e.pointerType === 'mouse') { mouseButtons(e); return; }
+    if (mode !== 'play') return;
+    canvas.setPointerCapture(e.pointerId);
+    if (e.clientX < innerWidth / 2 && joy.id === null) Object.assign(joy, { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 });
+    else touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') {
+      mouseButtons(e);
+      if (lmb || rmb) look(e.movementX, e.movementY);
+      return;
+    }
+    if (e.pointerId === joy.id) { joy.dx = e.clientX - joy.x0; joy.dy = e.clientY - joy.y0; return; }
+    const t = touches.get(e.pointerId); if (!t) return;
+    look(e.clientX - t.x, e.clientY - t.y); t.x = e.clientX; t.y = e.clientY;
+  });
+  const up = e => {
+    if (e.pointerType === 'mouse') { mouseButtons(e); return; }
+    if (e.pointerId === joy.id) { joy.id = null; joy.dx = joy.dy = 0; }
+    touches.delete(e.pointerId);
+  };
+  canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('wheel', e => { e.preventDefault(); dist = Math.min(30, Math.max(1.5, dist * (1 + Math.sign(e.deltaY) * 0.12))); }, { passive: false });
+
+  // ---------- Physik / Loop ----------
+  let velY = 0, onGround = true, lean = 0, leanTarget = 0, moveState = 'idle';
+  const vel = new THREE.Vector3();
+  const clock = new THREE.Clock();
+
+  function setAction(next) {
+    if (!next || next === current) return;
+    next.reset().fadeIn(0.2).play();
+    if (current) current.fadeOut(0.2);
+    current = next;
+  }
+
+  function tick() {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const play = mode === 'play';
+    const k = c => play && keys.has(c);
+
+    let fwd = 0, str = 0, turn = 0;
+    if (k('KeyW') || k('ArrowUp')) fwd += 1;
+    if (k('KeyS') || k('ArrowDown')) fwd -= 1;
+    if (play && (autorun || (lmb && rmb))) fwd = Math.max(fwd, 1);
+    if (k('KeyQ')) str += 1;
+    if (k('KeyE')) str -= 1;
+    const left = k('KeyA') || k('ArrowLeft'), right = k('KeyD') || k('ArrowRight');
+    if (rmb) { if (left) str += 1; if (right) str -= 1; }   // mit rechter Maustaste: A/D strafen
+    else { if (left) turn += 1; if (right) turn -= 1; }   // sonst: A/D drehen
+    if (play && joy.id !== null) {
+      if (Math.abs(joy.dy) > 12) fwd = joy.dy < 0 ? 1 : -1;
+      if (Math.abs(joy.dx) > 12) turn -= Math.max(-1, Math.min(1, joy.dx / 60));
+    }
+    str = Math.max(-1, Math.min(1, str));
+    facing += turn * MOVE.turn * dt;
+
+    const moving = fwd !== 0 || str !== 0;
+    if (onGround) {
+      const fx = Math.sin(facing), fz = Math.cos(facing);   // vorwärts
+      const lx = Math.cos(facing), lz = -Math.sin(facing);  // links
+      vel.set(fx * fwd + lx * str, 0, fz * fwd + lz * str);
+      if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(fwd < 0 ? MOVE.back : MOVE.run);
+      if (k('Space')) { velY = MOVE.jumpV; onGround = false; } // Im Sprung bleibt die Richtung fest
+      leanTarget = fwd > 0 ? str * Math.PI / 4 : fwd < 0 ? -str * Math.PI / 4 : str * Math.PI / 2;
+      moveState = !moving ? 'idle' : fwd < 0 ? 'back' : 'run';
+    }
+    player.position.addScaledVector(vel, dt);
+    velY -= MOVE.g * dt;
+    player.position.y += velY * dt;
+    if (player.position.y <= 0) { player.position.y = 0; velY = 0; onGround = true; }
+    player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
+    player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
+    player.rotation.y = facing;
+
+    let dl = leanTarget - lean; lean += dl * Math.min(1, dt * 10);
+    leanGroup.rotation.y = lean;
+
+    if (mixer) {
+      if (moveState === 'idle') setAction(actIdle || actWalk);
+      else if (moveState === 'back') {
+        if (actBack) setAction(actBack);
+        else if (actWalk) { setAction(actWalk); actWalk.timeScale = -0.7; }
+      } else setAction(actWalk || actIdle);
+      if (actWalk && moveState !== 'back') actWalk.timeScale = 1;
+      mixer.update(dt);
+    }
+
+    // Kamera schwenkt beim Laufen hinter die Figur zurück (wie "Kamera folgt beim Bewegen")
+    if (moving && onGround && !lmb) camOff *= Math.exp(-dt * 4);
+    camOff = Math.atan2(Math.sin(camOff), Math.cos(camOff));
+    let camYaw = facing + camOff, cd = dist, cp = pitch;
+    let tx = player.position.x, ty = player.position.y + modelHeight * 0.85, tz = player.position.z;
+    if (!play) {
+      // Charakterauswahl: Kamera von vorn, leicht pendelnd, Figur links vom Auswahlfeld
+      previewAng += dt * 0.35;
+      camYaw = facing + Math.PI + Math.sin(previewAng) * 0.5;
+      cd = modelHeight * 1.5 + 2; cp = 0.12;
+      ty = player.position.y + modelHeight * 0.55;
+      const pan = innerWidth > 640 ? modelHeight * 0.55 + 0.4 : 0;
+      tx += -Math.cos(camYaw) * pan; tz += Math.sin(camYaw) * pan;
+    }
+    camera.position.set(
+      tx - Math.sin(camYaw) * Math.cos(cp) * cd,
+      Math.max(0.3, ty + Math.sin(cp) * cd),
+      tz - Math.cos(camYaw) * Math.cos(cp) * cd
+    );
+    camera.lookAt(tx, ty, tz);
+
+    sun.position.set(player.position.x + 20, 40, player.position.z + 12);
+    sun.target.position.copy(player.position);
+
+    $('coords').textContent = `x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
+
+    coopUpdate(dt);
+    resize();
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+  }
+
+  // ---------- Import ----------
+  const status = (msg, kind = '') => ['status', 'selStatus'].forEach(id => { const s = $(id); s.textContent = msg; s.className = 'status ' + kind; });
+  const base = n => decodeURIComponent(String(n).split('?')[0].split(/[\\/]/).pop()).toLowerCase();
+
+  const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g)$/i;
+
+  // Lädt ein wow.export-Modell aus einer Dateiliste; Texturen werden über den Dateinamen zugeordnet
+  async function parseModel(fileList) {
+    const files = [...fileList].filter(f => MODEL_EXT.test(f.name));
+    const pick = ext => files.filter(f => f.name.toLowerCase().endsWith(ext));
+    const main = pick('.glb')[0] || pick('.gltf')[0] || pick('.obj')[0];
+    if (!main) throw new Error('Keine .gltf-, .glb- oder .obj-Datei gefunden. Wähle die Modelldatei mit aus.');
+    const urls = [], map = {};
+    for (const f of files) { const u = URL.createObjectURL(f); urls.push(u); map[base(f.name)] = u; }
+    const own = new Set(urls), missing = [];
+    const manager = new THREE.LoadingManager();
+    manager.setURLModifier(url => {
+      if (url.startsWith('data:') || own.has(url)) return url;
+      const hit = map[base(url)];
+      if (hit) return hit;
+      missing.push(base(url));
+      return url;
+    });
+    let root, anims = [];
+    const mainURL = map[base(main.name)];
+    if (main.name.toLowerCase().endsWith('.obj')) {
+      const loader = new THREE.OBJLoader(manager);
+      const stem = base(main.name).replace(/\.obj$/, '');
+      const mtl = pick('.mtl').find(f => base(f.name).startsWith(stem)) || pick('.mtl')[0];
+      if (mtl) { const mats = await new THREE.MTLLoader(manager).loadAsync(map[base(mtl.name)]); mats.preload(); loader.setMaterials(mats); }
+      root = await loader.loadAsync(mainURL);
+    } else {
+      const gltf = await new THREE.GLTFLoader(manager).loadAsync(mainURL);
+      root = gltf.scene || gltf.scenes[0]; anims = gltf.animations || [];
+    }
+    prepMeshes(root);
+    return { root, anims, main: main.name, missing, urls };
+  }
+
+  function prepMeshes(root) {
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true;
+      o.frustumCulled = false; // Skinned Meshes von WoW haben oft zu kleine Bounds
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+        if (m.map) { m.map.encoding = THREE.sRGBEncoding; m.map.needsUpdate = true; }
+        m.side = THREE.DoubleSide; m.needsUpdate = true;
+      });
+    });
+  }
+  function setAlpha(root, on) {
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) { m.alphaTest = on ? 0.5 : 0; m.transparent = false; m.needsUpdate = true; } });
+    });
+  }
+  function disposeModel(root) {
+    root.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m) return; m.map?.dispose(); m.dispose(); });
+    });
+  }
+  async function loadFiles(fileList, settings = null, persist = true) {
+    const files = [...fileList].filter(f => MODEL_EXT.test(f.name));
+    if (!files.length) { status('Keine Modelldateien gefunden (.gltf, .glb, .obj, .bin, .mtl, .png).', 'err'); return; }
+    const slotAtStart = active;
+    status('Lade Modell …');
+    try {
+      const res = await parseModel(files);
+      const { root, anims, missing } = res; const main = { name: res.main };
+      if (slotAtStart !== active) { res.urls.forEach(URL.revokeObjectURL); disposeModel(root); return; } // inzwischen anderer Platz gewählt
+      blobURLs.forEach(URL.revokeObjectURL); blobURLs = res.urls;
+      if (persist) {
+        const slot = slots[active] || { name: '' };
+        slots[active] = { name: slot.name || main.name.replace(/\.[^.]+$/, ''), files, settings: null, main: main.name };
+      }
+      installModel(root, anims, settings);
+      if (persist) {
+        saveSettings(true); renderSlots();
+        // Mitspieler mit diesem Modell jetzt auch richtig darstellen
+        for (const R of remotes.values()) if (!R.model && R.mk && R.mk === main.name.toLowerCase()) loadRemoteModel(R, R.lastPr || {});
+      }
+      const extra = missing.length ? ` Fehlend: ${[...new Set(missing)].slice(0, 4).join(', ')}` : '';
+      status(`${main.name} geladen · ${anims.length} Animation${anims.length === 1 ? '' : 'en'}.${extra}`, missing.length ? 'err' : 'ok');
+    } catch (err) {
+      console.error(err);
+      status(`Laden fehlgeschlagen: ${err.message || err}`, 'err');
+    }
+  }
+
+  function installModel(root, anims, settings) {
+    clearModel();
+    model = root;
+    pivot.add(model);
+    placeholder.visible = false;
+
+    clips = anims;
+    if (clips.length) {
+      mixer = new THREE.AnimationMixer(model);
+      fillSelect($('animIdle'), clips, /stand|idle/i, 0);
+      fillSelect($('animWalk'), clips, /^(?!.*back).*(run|walk)/i, -1);
+      fillSelect($('animBack'), clips, /back/i, -1);
+      if (settings) {
+        selectByName($('animIdle'), settings.idle); selectByName($('animWalk'), settings.walk); selectByName($('animBack'), settings.back);
+      }
+      applyAnims();
+    } else {
+      ['animIdle', 'animWalk', 'animBack'].forEach(id => fillSelect($(id), [], null, -1));
+    }
+    $('modelSettings').disabled = false;
+    $('animIdle').disabled = $('animWalk').disabled = $('animBack').disabled = !clips.length;
+    $('height').value = settings?.height ?? 2;
+    $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
+    rotOffset = settings?.rot ?? -Math.PI / 2;
+    $('alpha').checked = !!settings?.alpha;
+    applyAlpha();
+    fitModel();
+  }
+
+  function selectByName(sel, name) {
+    if (name === undefined) return;
+    if (name === null) { sel.value = ''; return; }
+    const i = clips.findIndex(c => c.name === name);
+    if (i >= 0) sel.value = String(i);
+  }
+  const clipName = sel => sel.value === '' ? null : clips[+sel.value]?.name ?? null;
+
+  function fillSelect(sel, list, re, fallback) {
+    sel.innerHTML = '<option value="">– keine –</option>';
+    list.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = c.name || `Animation ${i}`; sel.append(o); });
+    let idx = re ? list.findIndex(c => re.test(c.name)) : -1;
+    if (idx < 0) idx = fallback;
+    sel.value = idx >= 0 && idx < list.length ? String(idx) : '';
+  }
+
+  function applyAnims() {
+    if (!mixer) return;
+    mixer.stopAllAction(); current = null;
+    const get = sel => sel.value === '' ? null : mixer.clipAction(clips[+sel.value]);
+    actIdle = get($('animIdle')); actWalk = get($('animWalk')); actBack = get($('animBack'));
+  }
+
+  // Begrenzungsbox im Raum des Pivots (unabhängig davon, wo die Figur gerade steht),
+  // bei Skinned Meshes mit der echten Pose statt der Bind-Pose
+  function poseBox(pv, mdl) {
+    const box = new THREE.Box3(), vtx = new THREE.Vector3(), m = new THREE.Matrix4();
+    pv.updateMatrixWorld(true);
+    const inv = pv.matrixWorld.clone().invert();
+    mdl.traverse(o => {
+      if (!o.isMesh || !o.geometry.attributes.position) return;
+      m.multiplyMatrices(inv, o.matrixWorld);
+      const pos = o.geometry.attributes.position;
+      const step = Math.max(1, Math.floor(pos.count / 4000));
+      if (o.isSkinnedMesh) o.skeleton.update();
+      for (let i = 0; i < pos.count; i += step) {
+        vtx.fromBufferAttribute(pos, i);
+        if (o.isSkinnedMesh) o.boneTransform(i, vtx);
+        box.expandByPoint(vtx.applyMatrix4(m));
+      }
+    });
+    return box;
+  }
+
+  function fitModel() {
+    if (!model) return;
+    if (mixer && (actIdle || actWalk)) { mixer.stopAllAction(); current = null; setAction(actIdle || actWalk); mixer.update(0); }
+    const target = parseFloat($('height').value);
+    fitInto(pivot, model, target, rotOffset);
+    modelHeight = target;
+  }
+
+  // Skaliert ein Modell auf die Zielhöhe, stellt die Füße auf den Boden und die Mitte auf die Drehachse
+  function fitInto(pv, mdl, height, rot) {
+    mdl.position.set(0, 0, 0); mdl.scale.setScalar(1);
+    pv.rotation.set(0, rot, 0);
+    mdl.updateMatrixWorld(true);
+    const box = poseBox(pv, mdl);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3());
+    const s = size.y > 0 ? height / size.y : 1;
+    const c = box.getCenter(new THREE.Vector3());
+    mdl.scale.setScalar(s);
+    mdl.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+  }
+
+  function applyAlpha() {
+    if (model) setAlpha(model, $('alpha').checked);
+  }
+
+  function clearModel() {
+    if (mixer) { mixer.stopAllAction(); mixer = null; }
+    actIdle = actWalk = actBack = current = null; clips = [];
+    if (model) {
+      pivot.remove(model);
+      disposeModel(model);
+      model = null;
+    }
+  }
+
+  // ---------- UI-Verdrahtung ----------
+  $('pickFiles').onclick = () => $('fileInput').click();
+  $('pickFolder').onclick = () => $('folderInput').click();
+  $('fileInput').onchange = e => { loadFiles(e.target.files); e.target.value = ''; };
+  $('folderInput').onchange = e => { loadFiles(e.target.files); e.target.value = ''; };
+  $('height').oninput = e => { $('heightVal').textContent = `${(+e.target.value).toFixed(1)} m`; fitModel(); saveSettings(); };
+  $('rotL').onclick = () => { rotOffset += Math.PI / 2; fitModel(); saveSettings(); };
+  $('rotR').onclick = () => { rotOffset -= Math.PI / 2; fitModel(); saveSettings(); };
+  $('alpha').onchange = () => { applyAlpha(); saveSettings(); };
+  ['animIdle', 'animWalk', 'animBack'].forEach(id => $(id).onchange = () => { applyAnims(); saveSettings(); });
+  $('resetModel').onclick = () => { removeModel(); };
+
+  // ---------- Charakterplätze (IndexedDB, nur in diesem Browser) ----------
+  let slots = [null, null, null], active = 0, db = null, saveTimer = 0, clearArmed = 0;
+
+  function openDB() {
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('wanderfeld', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('slots');
+        r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
+      } catch (_) { res(null); }
+    });
+  }
+  function dbPut(i) {
+    if (!db) return;
+    try {
+      const st = db.transaction('slots', 'readwrite').objectStore('slots');
+      slots[i] ? st.put(slots[i], i) : st.delete(i);
+    } catch (e) { console.warn(e); }
+  }
+  function dbLoad() {
+    return new Promise(res => {
+      const out = [null, null, null];
+      if (!db) return res(out);
+      try {
+        const st = db.transaction('slots').objectStore('slots'); let n = 0;
+        [0, 1, 2].forEach(i => { const r = st.get(i); r.onsuccess = () => { out[i] = r.result || null; if (++n === 3) res(out); }; r.onerror = () => { if (++n === 3) res(out); }; });
+      } catch (_) { res(out); }
+    });
+  }
+  function saveSettings(now) {
+    const slot = slots[active]; if (!slot || !model) return;
+    slot.settings = { height: +$('height').value, rot: rotOffset, alpha: $('alpha').checked,
+      idle: clipName($('animIdle')), walk: clipName($('animWalk')), back: clipName($('animBack')) };
+    clearTimeout(saveTimer);
+    if (now) dbPut(active); else saveTimer = setTimeout(() => dbPut(active), 300);
+  }
+
+  const ROMAN = ['I', 'II', 'III'];
+  function renderSlots() {
+    const list = $('slotList'); list.innerHTML = '';
+    slots.forEach((sl, i) => {
+      const b = document.createElement('button');
+      b.className = 'slot'; b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(i === active));
+      const has = sl && sl.files && sl.files.length;
+      b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
+      b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
+      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : 'Leer · Platzhalter';
+      b.onclick = () => activateSlot(i);
+      b.ondblclick = () => { activateSlot(i); enterPlay(); };
+      list.append(b);
+    });
+    $('slotName').value = (slots[active] && slots[active].name) || '';
+    $('slotName').placeholder = `Charakter ${active + 1}`;
+    const has = slots[active] && slots[active].files && slots[active].files.length;
+    $('slotClear').disabled = !slots[active];
+  }
+
+  function showPlaceholder(msg) {
+    clearModel(); placeholder.visible = true; modelHeight = 2;
+    $('modelSettings').disabled = true;
+    status(msg);
+  }
+
+  function activateSlot(i) {
+    active = i; clearArmed = 0; $('slotClear').textContent = 'Platz leeren';
+    renderSlots();
+    const sl = slots[i];
+    if (sl && sl.files && sl.files.length) loadFiles(sl.files, sl.settings, false);
+    else showPlaceholder('Leerer Platz. Lade einen Ordner aus wow.export oder spiel mit dem Platzhalter.');
+  }
+
+  function removeModel() {
+    if (slots[active]) { slots[active].files = []; slots[active].settings = null; slots[active].main = null; dbPut(active); }
+    renderSlots();
+    showPlaceholder('Modell entfernt. Platzhalter aktiv.');
+  }
+
+  function resetPlayer() {
+    player.position.set(0, 0, 0); facing = 0; camOff = 0; pitch = 0.3;
+    vel.set(0, 0, 0); velY = 0; onGround = true; lean = leanTarget = 0; moveState = 'idle';
+  }
+  function enterPlay() {
+    mode = 'play'; resetPlayer();
+    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false;
+    canvas.focus();
+  }
+  function enterSelect() {
+    mode = 'select'; keys.clear(); autorun = false; lmb = rmb = false;
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    resetPlayer();
+    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true;
+    renderSlots();
+  }
+
+  $('slotName').oninput = e => {
+    slots[active] = slots[active] || { name: '', files: [], settings: null };
+    slots[active].name = e.target.value.trim();
+    const nm = $('slotList').children[active]?.querySelector('.nm');
+    if (nm) nm.textContent = slots[active].name || `Charakter ${active + 1}`;
+    clearTimeout(saveTimer); saveTimer = setTimeout(() => dbPut(active), 300);
+    $('slotClear').disabled = false;
+  };
+  $('slotFolder').onclick = () => $('folderInput').click();
+  $('slotFiles').onclick = () => $('fileInput').click();
+  $('slotClear').onclick = () => {
+    if (!clearArmed) {
+      clearArmed = setTimeout(() => { clearArmed = 0; $('slotClear').textContent = 'Platz leeren'; }, 3000);
+      $('slotClear').textContent = 'Wirklich leeren? Nochmal klicken';
+      return;
+    }
+    clearTimeout(clearArmed); clearArmed = 0; $('slotClear').textContent = 'Platz leeren';
+    slots[active] = null; dbPut(active);
+    renderSlots(); showPlaceholder('Platz geleert.');
+  };
+  $('playBtn').onclick = enterPlay;
+  $('toSelect').onclick = enterSelect;
+  $('togglePanel').onclick = () => {
+    const p = $('panel'); const c = p.classList.toggle('collapsed');
+    $('togglePanel').textContent = c ? 'öffnen' : 'einklappen';
+    $('togglePanel').setAttribute('aria-expanded', String(!c));
+  };
+
+  let dragDepth = 0;
+  addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; $('drop').hidden = false; });
+  addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('drop').hidden = true; } });
+  addEventListener('dragover', e => e.preventDefault());
+  addEventListener('drop', async e => {
+    e.preventDefault(); dragDepth = 0; $('drop').hidden = true;
+    const items = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (items.some(en => en.isDirectory)) {
+      const out = [];
+      const walk = en => new Promise(res => {
+        if (en.isFile) en.file(f => { out.push(f); res(); }, () => res());
+        else { const r = en.createReader(); const all = [];
+          const read = () => r.readEntries(async batch => { if (!batch.length) { await Promise.all(all.map(walk)); res(); } else { all.push(...batch); read(); } }, () => res());
+          read(); }
+      });
+      await Promise.all(items.map(walk));
+      loadFiles(out);
+    } else loadFiles(e.dataTransfer.files);
+  });
+
+  // ---------- Koop (room-Capability: alle, die die Seite gerade offen haben) ----------
+  let sendClock = 0, lastSent = '';
+  const myHue = Math.floor(Math.random() * 360);
+  const remotes = new Map();
+  const myName = () => (slots[active] && slots[active].name) || `Charakter ${active + 1}`;
+  const myKey = () => (model && slots[active] && slots[active].main) ? slots[active].main.toLowerCase() : null;
+  const r2 = x => Math.round(x * 100) / 100;
+
+  function nameTag(text) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+    const g = c.getContext('2d');
+    g.font = '600 44px "Source Sans 3", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.strokeText(text, 256, 48);
+    g.fillStyle = '#6cb8ff'; g.fillText(text, 256, 48);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true }));
+    sp.scale.set(2.6, 0.49, 1); sp.renderOrder = 10;
+    return sp;
+  }
+
+  function makeRemote(peer) {
+    const group = new THREE.Group(), leanG = new THREE.Group(), pv = new THREE.Group();
+    group.add(leanG); leanG.add(pv);
+    const ph = makePlaceholder(); leanG.add(ph);
+    scene.add(group);
+    const R = { peer, group, leanG, pv, ph, model: null, mixer: null, clips: [], acts: {}, cur: null, mk: undefined, sig: '', name: '', hue: -1, tag: null, urls: [], init: false, t: { x: 0, y: 0, z: 0, f: 0, l: 0 }, h: 2 };
+    remotes.set(peer, R);
+    return R;
+  }
+  function dropRemoteModel(R) {
+    if (R.mixer) R.mixer.stopAllAction();
+    if (R.model) { R.pv.remove(R.model); disposeModel(R.model); }
+    R.urls.forEach(URL.revokeObjectURL);
+    Object.assign(R, { model: null, mixer: null, clips: [], acts: {}, cur: null, urls: [] });
+    R.ph.visible = true;
+  }
+  function removeRemote(peer) {
+    const R = remotes.get(peer); if (!R) return;
+    dropRemoteModel(R); scene.remove(R.group); remotes.delete(peer);
+  }
+  function applyRemoteLook(R, pr) {
+    R.h = typeof pr.h === 'number' ? Math.min(8, Math.max(0.5, pr.h)) : 2;
+    if (!R.model) { R.ph.scale.setScalar(1); return; }
+    setAlpha(R.model, !!pr.a);
+    const byName = n => { const c = R.clips.find(c => c.name === n); return c ? R.mixer.clipAction(c) : null; };
+    if (R.mixer) {
+      R.mixer.stopAllAction(); R.cur = null;
+      R.acts = { idle: byName(pr.ai), walk: byName(pr.aw), back: byName(pr.ab) };
+      const pose = R.acts.idle || R.acts.walk; if (pose) { pose.reset().play(); R.cur = pose; R.mixer.update(0); }
+    }
+    fitInto(R.pv, R.model, R.h, typeof pr.r === 'number' ? pr.r : -Math.PI / 2);
+  }
+  async function loadRemoteModel(R, pr) {
+    const key = R.mk;
+    const slot = key && slots.find(sl => sl && sl.main && sl.main.toLowerCase() === key && sl.files && sl.files.length);
+    if (!slot) return; // Modell nicht lokal vorhanden: Platzhalter bleibt
+    try {
+      const res = await parseModel(slot.files);
+      if (R.mk !== key || !remotes.has(R.peer)) { res.urls.forEach(URL.revokeObjectURL); disposeModel(res.root); return; }
+      R.model = res.root; R.urls = res.urls; R.clips = res.anims;
+      R.mixer = res.anims.length ? new THREE.AnimationMixer(res.root) : null;
+      R.pv.add(res.root); R.ph.visible = false;
+      applyRemoteLook(R, R.lastPr || pr);
+    } catch (e) { console.warn(e); }
+  }
+  function syncPeer(peer) {
+    if (peer.sameTab || peer.kind !== 'viewer') return;
+    const pr = peer.presence || {};
+    const R = remotes.get(peer.peer) || makeRemote(peer.peer);
+    R.lastPr = pr;
+    const playing = pr.m === 'play' && Array.isArray(pr.p) && pr.p.length === 3 && pr.p.every(Number.isFinite);
+    R.group.visible = playing;
+    if (!playing) return;
+    const name = String(pr.n || 'Abenteurer').slice(0, 24);
+    if (name !== R.name) {
+      R.name = name;
+      if (R.tag) { R.group.remove(R.tag); R.tag.material.map.dispose(); R.tag.material.dispose(); }
+      R.tag = nameTag(name); R.group.add(R.tag);
+    }
+    const hue = Number.isFinite(pr.c) ? pr.c : 0;
+    if (hue !== R.hue) { R.hue = hue; R.ph.children[0].material = R.ph.children[0].material.clone(); R.ph.children[0].material.color.setHSL(hue / 360, 0.55, 0.55); }
+    const num = (v, d = 0) => Number.isFinite(v) ? v : d;
+    R.t = { x: pr.p[0], y: pr.p[1], z: pr.p[2], f: num(pr.f), l: num(pr.l), s: pr.s };
+    if (!R.init) { R.init = true; R.group.position.set(R.t.x, R.t.y, R.t.z); R.group.rotation.y = R.t.f; }
+    const mk = typeof pr.mk === 'string' ? pr.mk.toLowerCase() : null;
+    if (mk !== R.mk) { R.mk = mk; R.sig = ''; dropRemoteModel(R); if (mk) loadRemoteModel(R, pr); }
+    const sig = JSON.stringify([pr.h, pr.r, pr.a, pr.ai, pr.aw, pr.ab]);
+    if (sig !== R.sig) { R.sig = sig; applyRemoteLook(R, pr); }
+  }
+
+  function renderParty() {
+    const box = $('party'); box.innerHTML = '';
+    const head = document.createElement('div'); head.className = 'ttl';
+    const others = [...netStates.entries()].map(([id, st]) => ({ peer: id, presence: st, guest: false }));
+    head.innerHTML = '<span>Gruppe</span><span class="dot"></span>';
+    head.querySelector('.dot').textContent = !net.peer ? 'solo' : !net.ready ? 'verbinde …' : `${others.length + 1} online${net.code ? ' · ' + net.code : ''}`;
+    box.append(head);
+    const row = (hue, label, note) => {
+      const d = document.createElement('div'); d.className = 'mem';
+      d.innerHTML = '<i></i><span></span><small></small>';
+      d.querySelector('i').style.background = `hsl(${hue} 55% 55%)`;
+      d.querySelector('span').textContent = label; d.querySelector('small').textContent = note;
+      box.append(d);
+    };
+    row(myHue, myName(), 'du');
+    others.forEach(p => {
+      const pr = p.presence || {};
+      row(Number.isFinite(pr.c) ? pr.c : 0, String(pr.n || 'Abenteurer').slice(0, 24), pr.m === 'play' ? (p.guest ? 'Gast' : '') : 'Auswahl');
+    });
+  }
+
+  function coopUpdate(dt) {
+    // Mitspieler weich zur gemeldeten Position bewegen
+    for (const R of remotes.values()) {
+      if (!R.group.visible) continue;
+      const k = Math.min(1, dt * 12), g = R.group, t = R.t;
+      g.position.x += (t.x - g.position.x) * k; g.position.y += (t.y - g.position.y) * k; g.position.z += (t.z - g.position.z) * k;
+      let df = Math.atan2(Math.sin(t.f - g.rotation.y), Math.cos(t.f - g.rotation.y)); g.rotation.y += df * k;
+      R.leanG.rotation.y += (t.l - R.leanG.rotation.y) * k;
+      if (R.tag) R.tag.position.y = (R.model ? R.h : 2) + 0.35;
+      if (R.mixer) {
+        const a = R.acts;
+        let next = t.s === 'idle' ? (a.idle || a.walk) : t.s === 'back' ? (a.back || a.walk) : (a.walk || a.idle);
+        if (next && next !== R.cur) { next.reset().fadeIn(0.2).play(); if (R.cur) R.cur.fadeOut(0.2); R.cur = next; }
+        if (a.walk) a.walk.timeScale = (t.s === 'back' && !a.back) ? -0.7 : 1;
+        R.mixer.update(dt);
+      }
+    }
+    // Eigenen Stand senden (~15 Mal pro Sekunde, nur bei Änderung)
+    if (!net.ready) return;
+    sendClock += dt; if (sendClock < 1 / 15) return; sendClock = 0;
+    keepAlive += 1 / 15;
+    const me = mode === 'play'
+      ? { m: 'play', n: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
+          mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
+          ai: model ? clipName($('animIdle')) : null, aw: model ? clipName($('animWalk')) : null, ab: model ? clipName($('animBack')) : null }
+      : { m: 'select', n: myName(), c: myHue, p: null, mk: null };
+    const json = JSON.stringify(me);
+    if (json === lastSent && keepAlive < 2) return;
+    lastSent = json; keepAlive = 0;
+    netSend({ t: 's', id: net.id, st: me });
+    // Mitspieler, von denen lange nichts kam, entfernen
+    const now = performance.now();
+    for (const [id, at] of netSeen) if (now - at > 10000) netDrop(id);
+  }
+
+  // ---------- Netzwerk: Peer-to-Peer über PeerJS ----------
+  // Der Gastgeber ist der Knoten in der Mitte: Er empfängt die Stände aller und reicht sie an die anderen weiter.
+  let keepAlive = 0;
+  const net = { peer: null, conns: new Set(), host: false, ready: false, code: '', id: Math.random().toString(36).slice(2, 10) };
+  const netStates = new Map(), netSeen = new Map(), connIds = new Map();
+  const CODE_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const newCode = () => Array.from({ length: 5 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
+  const peerIdFor = code => 'wanderfeld-koop-' + code.toLowerCase();
+
+  function netMsg(text, kind = '') { const e = $('netState'); e.textContent = text; e.className = 'netstate ' + kind; }
+  function netSend(msg, except) { for (const c of net.conns) if (c !== except && c.open) { try { c.send(msg); } catch (_) {} } }
+
+  function netDrop(id) {
+    netStates.delete(id); netSeen.delete(id); removeRemote(id);
+    if (net.host) netSend({ t: 'l', id });
+    renderParty();
+  }
+  function netReceive(msg, conn) {
+    if (!msg || typeof msg !== 'object' || typeof msg.id !== 'string' || msg.id === net.id || msg.id.length > 20) return;
+    if (msg.t === 's' && msg.st && typeof msg.st === 'object') {
+      const prev = netStates.get(msg.id);
+      netStates.set(msg.id, msg.st); netSeen.set(msg.id, performance.now());
+      if (net.host && conn) { if (!connIds.has(conn)) connIds.set(conn, new Set()); connIds.get(conn).add(msg.id); netSend(msg, conn); }
+      syncPeer({ peer: msg.id, sameTab: false, kind: 'viewer', guest: false, presence: msg.st });
+      if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
+    } else if (msg.t === 'l') {
+      netDrop(msg.id);
+    }
+  }
+  function wireConn(conn) {
+    conn.on('open', () => {
+      net.conns.add(conn); net.ready = true; lastSent = '';
+      if (net.host) for (const [id, st] of netStates) conn.send({ t: 's', id, st }); // Neuankömmling bekommt alle bekannten Stände
+      else netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok');
+      if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
+      renderParty();
+    });
+    conn.on('data', d => netReceive(d, conn));
+    const gone = () => {
+      if (!net.conns.has(conn)) return;
+      net.conns.delete(conn);
+      if (net.host) { (connIds.get(conn) || []).forEach(netDrop); connIds.delete(conn); netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok'); }
+      else { for (const id of [...netStates.keys()]) netDrop(id); net.ready = false; netMsg('Verbindung zum Gastgeber verloren.', 'err'); }
+      renderParty();
+    };
+    conn.on('close', gone); conn.on('error', gone);
+  }
+  function netReset() {
+    for (const c of net.conns) { try { c.close(); } catch (_) {} }
+    net.conns.clear(); connIds.clear();
+    if (net.peer) { try { net.peer.destroy(); } catch (_) {} }
+    Object.assign(net, { peer: null, host: false, ready: false, code: '' });
+    for (const id of [...netStates.keys()]) { netStates.delete(id); netSeen.delete(id); removeRemote(id); }
+    $('codeBox').hidden = true;
+    renderParty();
+  }
+  function hostGame(tries = 0) {
+    if (typeof Peer === 'undefined') { netMsg('Koop-Bibliothek nicht geladen. Bist du online?', 'err'); return; }
+    netReset();
+    const code = newCode();
+    net.host = true; net.code = code;
+    netMsg('Erstelle Spiel …');
+    const p = net.peer = new Peer(peerIdFor(code));
+    p.on('open', () => {
+      net.ready = true; lastSent = '';
+      $('codeVal').textContent = code; $('codeBox').hidden = false;
+      netMsg(`Spiel ${code} offen. Schick den Code an deine Mitspieler.`, 'ok');
+      renderParty();
+    });
+    p.on('connection', wireConn);
+    p.on('error', e => {
+      if (e.type === 'unavailable-id' && tries < 3) { hostGame(tries + 1); return; }
+      netMsg(`Fehler beim Erstellen: ${e.type || e.message}`, 'err');
+    });
+    p.on('disconnected', () => { if (net.peer === p && !p.destroyed) { try { p.reconnect(); } catch (_) {} } });
+  }
+  function joinGame(raw) {
+    const code = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 5) { netMsg('Der Code hat 5 Zeichen.', 'err'); return; }
+    if (typeof Peer === 'undefined') { netMsg('Koop-Bibliothek nicht geladen. Bist du online?', 'err'); return; }
+    netReset();
+    net.code = code;
+    netMsg(`Suche Spiel ${code} …`);
+    const p = net.peer = new Peer();
+    p.on('open', () => wireConn(p.connect(peerIdFor(code), { reliable: true })));
+    p.on('error', e => {
+      if (e.type === 'peer-unavailable') netMsg(`Kein offenes Spiel mit Code ${code} gefunden.`, 'err');
+      else netMsg(`Verbindung fehlgeschlagen: ${e.type || e.message}`, 'err');
+      renderParty();
+    });
+    renderParty();
+  }
+  $('hostBtn').onclick = () => hostGame();
+  $('joinBtn').onclick = () => joinGame($('joinCode').value);
+  $('joinCode').onkeydown = e => { if (e.key === 'Enter') joinGame(e.target.value); };
+  $('copyCode').onclick = async () => {
+    try { await navigator.clipboard.writeText(net.code); $('copyCode').textContent = 'kopiert'; }
+    catch (_) { const r = document.createRange(); r.selectNodeContents($('codeVal')); getSelection().removeAllRanges(); getSelection().addRange(r); }
+    setTimeout(() => $('copyCode').textContent = 'kopieren', 1500);
+  };
+  addEventListener('beforeunload', () => { if (net.ready) netSend({ t: 'l', id: net.id }); });
+  function startCoop() { renderParty(); }
+
+  (async () => {
+    db = await openDB();
+    slots = await dbLoad();
+    const first = slots.findIndex(sl => sl && sl.files && sl.files.length);
+    enterSelect();
+    activateSlot(first >= 0 ? first : 0);
+    startCoop();
+    if (!db) status('Speichern ist in diesem Browserfenster nicht möglich (z. B. privates Fenster). Modelle gehen beim Neuladen verloren.', 'err');
+  })();
+  tick();
+})();
+</script>
+</body>
+</html>
