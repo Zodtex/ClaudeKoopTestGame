@@ -235,7 +235,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 23:35</p>
+<p class="ver">v 03.11. 23:40</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -2423,6 +2423,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   let menuOpen = false, worldLeft = false;
   const settings = { mouse: 1, invert: false, minimap: true, keys: true, names: true };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('wf-settings') || '{}')); } catch (_) {}
+  settings.minimap = true; // Minimap startet immer sichtbar; ausblenden gilt nur bis zum Neuladen
   function saveSettingsLocal() { try { localStorage.setItem('wf-settings', JSON.stringify(settings)); } catch (_) {} }
   function renderSettings() {
     $('setMouse').value = settings.mouse; $('setMouseVal').textContent = (+settings.mouse).toFixed(2) + '×';
