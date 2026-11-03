@@ -40,7 +40,7 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 @media (prefers-reduced-motion: reduce) { .loadbox .bar.indet i { animation: none; width: 100% !important; opacity: 0.5; } }
 .loadbox .lp { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Chat unten links */
-.chat { left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.chat { left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(104px + env(safe-area-inset-bottom, 0px)); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 .chatlog { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow: hidden; justify-content: flex-end; font-size: 13.5px; line-height: 1.35; }
 .chatlog .ln { text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.8); color: #fff; transition: opacity 1.2s; overflow-wrap: anywhere; }
 .chatlog .ln b { color: #ffd88a; font-weight: 600; }
@@ -58,6 +58,41 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .sndpanel { position: absolute; right: 0; top: calc(100% + 6px); width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .sndpanel .field { grid-template-columns: 74px 1fr; }
 .sndnow { font: 11px var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+/* Aktionsleiste unten mittig: eigene Steinleiste mit Goldkante und Medaillons an den Enden */
+.actionbar { left: 50%; bottom: calc(0px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: flex-end; gap: 0; pointer-events: none; }
+.ab-frame { position: relative; pointer-events: auto; padding: 12px 16px 10px; border-radius: 10px 10px 0 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.25)),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 2px, transparent 2px 58px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px),
+    #3a3530;
+  border: 2px solid #8e6d2f; border-bottom: 0;
+  box-shadow: inset 0 2px 0 #d9b25e, inset 0 -6px 12px rgba(0,0,0,0.45), 0 -4px 18px rgba(0,0,0,0.45); }
+.ab-frame::before { content: ""; position: absolute; left: 10px; right: 10px; top: 4px; height: 2px; background: linear-gradient(90deg, transparent, #b8924a 12%, #f0cf7d 50%, #b8924a 88%, transparent); opacity: 0.7; }
+.ab-slots { display: flex; gap: 6px; }
+.ab-cap { width: 86px; height: 86px; margin-bottom: -4px; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+.ab-cap.left { margin-right: -14px; z-index: 1; }
+.ab-cap.right { margin-left: -14px; z-index: 1; transform: scaleX(-1); }
+.ab-slot { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 5px; cursor: pointer; overflow: hidden;
+  background: radial-gradient(circle at 50% 38%, #4d4a44, #1d1b18 75%); border: 2px solid #6b5326;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.8), inset 0 4px 10px rgba(0,0,0,0.6); color: #f3d98f; }
+.ab-slot:hover { border-color: #e2b955; }
+.ab-slot:focus-visible { outline: 2px solid #fff3c4; outline-offset: 1px; }
+.ab-slot.pressed { transform: translateY(1px); border-color: #fff0b0; }
+.ab-slot.on { box-shadow: inset 0 0 0 2px #f0cf7d, inset 0 0 14px rgba(240,207,125,0.55); }
+.ab-slot svg { width: 30px; height: 30px; display: block; margin: auto; }
+.ab-slot .hk { position: absolute; top: 2px; right: 4px; font: 600 11px var(--f-mono); color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.ab-slot .cd { position: absolute; inset: 0; pointer-events: none; }
+.ab-slot.empty { cursor: default; background: radial-gradient(circle at 50% 38%, #2f2c28, #151412 75%); }
+.ab-tip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(10,12,22,0.94); border: 1px solid #9a8a5a; border-radius: 4px; padding: 6px 10px; font-size: 12.5px; color: #fff; pointer-events: none; }
+.ab-tip b { display: block; color: #ffd100; font-weight: 600; margin-bottom: 2px; }
+@media (max-width: 640px) {
+  .ab-cap { display: none; }
+  .ab-slot { width: 40px; height: 40px; }
+  .ab-slot svg { width: 22px; height: 22px; }
+  .ab-frame { padding: 9px 10px 8px; }
+  .chat { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
 /* Spielmenü (Esc) */
 .menuov { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(8,11,15,0.5); padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
 .menubox { width: min(320px, 100%); max-height: calc(100% - 40px); overflow-y: auto; background: var(--panel); border: 1px solid rgba(208,166,78,0.6); border-radius: 8px; padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 16px 50px rgba(0,0,0,0.5); }
@@ -202,6 +237,23 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <div class="mmzone" id="mmZone">Übungsfeld</div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
+<div class="hud actionbar" id="actionBar" hidden>
+  <div class="ab-cap left"><svg viewBox="0 0 86 86" aria-hidden="true"><defs><radialGradient id="capgL" cx="40%" cy="35%"><stop offset="0" stop-color="#f4d88a"/><stop offset="0.55" stop-color="#b8892f"/><stop offset="1" stop-color="#5c4214"/></radialGradient></defs>
+<circle cx="43" cy="43" r="38" fill="#2b2622" stroke="url(#capgL)" stroke-width="6"/>
+<circle cx="43" cy="43" r="27" fill="none" stroke="#8e6d2f" stroke-width="1.5"/>
+<path d="M43 14 L49 37 L72 43 L49 49 L43 72 L37 49 L14 43 L37 37 Z" fill="url(#capgL)" stroke="#3b2a0c" stroke-width="1"/>
+<path d="M43 26 L46 40 L60 43 L46 46 L43 60 L40 46 L26 43 L40 40 Z" fill="#2b2622" opacity="0.55"/>
+<circle cx="43" cy="43" r="4" fill="#f4d88a"/>
+<circle cx="43" cy="7" r="2.5" fill="#f4d88a"/><circle cx="43" cy="79" r="2.5" fill="#f4d88a"/><circle cx="7" cy="43" r="2.5" fill="#f4d88a"/><circle cx="79" cy="43" r="2.5" fill="#f4d88a"/></svg></div>
+  <div class="ab-frame"><div class="ab-slots" id="abSlots" role="toolbar" aria-label="Aktionsleiste"></div></div>
+  <div class="ab-cap right"><svg viewBox="0 0 86 86" aria-hidden="true"><defs><radialGradient id="capgR" cx="40%" cy="35%"><stop offset="0" stop-color="#f4d88a"/><stop offset="0.55" stop-color="#b8892f"/><stop offset="1" stop-color="#5c4214"/></radialGradient></defs>
+<circle cx="43" cy="43" r="38" fill="#2b2622" stroke="url(#capgR)" stroke-width="6"/>
+<circle cx="43" cy="43" r="27" fill="none" stroke="#8e6d2f" stroke-width="1.5"/>
+<path d="M43 14 L49 37 L72 43 L49 49 L43 72 L37 49 L14 43 L37 37 Z" fill="url(#capgR)" stroke="#3b2a0c" stroke-width="1"/>
+<path d="M43 26 L46 40 L60 43 L46 46 L43 60 L40 46 L26 43 L40 40 Z" fill="#2b2622" opacity="0.55"/>
+<circle cx="43" cy="43" r="4" fill="#f4d88a"/>
+<circle cx="43" cy="7" r="2.5" fill="#f4d88a"/><circle cx="43" cy="79" r="2.5" fill="#f4d88a"/><circle cx="7" cy="43" r="2.5" fill="#f4d88a"/><circle cx="79" cy="43" r="2.5" fill="#f4d88a"/></svg></div>
+</div>
 <div class="menuov" id="menuOv" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
   <div class="menubox">
     <div class="mtitle" id="menuTitle">Spielmenü</div>
@@ -235,7 +287,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 23:40</p>
+<p class="ver">v 03.11. 23:59</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -367,6 +419,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <button class="keyshead" id="keysToggle" aria-expanded="true">Steuerung</button>
   <kbd>Enter</kbd><span>Chat · /tanzen, /winken …</span>
   <kbd>Esc</kbd><span>Menü &amp; Einstellungen</span>
+  <kbd>1 – 6</kbd><span>Aktionsleiste</span>
   <kbd>M</kbd><span>Ton an/aus</span>
   <kbd>W / S</kbd><span>vor / rückwärts</span>
   <kbd>Shift</kbd><span>sprinten</span>
@@ -633,6 +686,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (typing() || mode !== 'play') return;
     if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === '/') { e.preventDefault(); openChat(e.key === '/' ? '/' : ''); return; }
     if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
+    const dg = /^(Digit|Numpad)([1-6])$/.exec(e.code);
+    if (dg) { e.preventDefault(); if (!e.repeat) useSlot(+dg[2] - 1); return; }
     if (e.code === 'NumLock' || e.code === 'KeyR') { if (!e.repeat) autorun = !autorun; }
     if (e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'ArrowUp' || e.code === 'ArrowDown') autorun = false;
     keys.add(e.code);
@@ -808,6 +863,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
     updateEnvFrame(dt);
     drawMinimap();
+    updateActionBar();
     tickBubbles();
     coopUpdate(dt);
     resize();
@@ -1187,7 +1243,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     audioStart();
-    $('selectPanel').hidden = true; $('panel').hidden = true; /* Charakterwechsel jetzt im Esc-Menü */ $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
+    $('selectPanel').hidden = true; $('panel').hidden = true; /* Charakterwechsel jetzt im Esc-Menü */ $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap; $('actionBar').hidden = false;
     if (worldLeft) { worldLeft = false; autoJoin(); }
     renderNameBar(); renderParty();
     canvas.focus();
@@ -1197,7 +1253,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     mode = 'select'; keys.clear(); autorun = false; lmb = rmb = false;
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     resetPlayer();
-    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true; $('chat').hidden = true; $('minimap').hidden = true; closeChat();
+    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true; $('chat').hidden = true; $('minimap').hidden = true; $('actionBar').hidden = true; closeChat();
     renderSlots(); renderNameBar(); renderParty();
   }
 
@@ -2418,6 +2474,62 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('volAmb').oninput = e => { vol.amb = +e.target.value; saveVol(); applyVol(); };
   $('volMute').onchange = e => { vol.mute = e.target.checked; saveVol(); applyVol(); };
   applyVol(); renderAudioAdmin();
+
+  // ---------- Aktionsleiste ----------
+  const ICONS = {
+    wave: '<path d="M9 21c-2-2-4-5-4-8V9a1.5 1.5 0 0 1 3 0v3M8 12V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V6a1.5 1.5 0 0 1 3 0v8c0 4-2 7-5 7H9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 4c1 .8 1.6 2 1.6 3.4M20.5 2c1.6 1.3 2.5 3.2 2.5 5.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+    dance: '<path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.6" fill="currentColor"/><circle cx="17.5" cy="16" r="2.6" fill="currentColor"/>',
+    cheer: '<path d="M12 2.5l2.7 6 6.5.6-4.9 4.3 1.5 6.4L12 16.5l-5.8 3.3 1.5-6.4L2.8 9.1l6.5-.6z" fill="currentColor" opacity="0.9"/>',
+    laugh: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 13.5c1 2.4 2.6 3.5 4.5 3.5s3.5-1.1 4.5-3.5z" fill="currentColor"/><path d="M8 9.5l2 1M16 9.5l-2 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    sit: '<circle cx="9" cy="5" r="2.2" fill="currentColor"/><path d="M9 8v6h6l2 6M9 11h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+    run: '<path d="M4 6l6 6-6 6M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  };
+  const ACTIONS = [
+    { name: 'Winken', desc: 'Grüßt alle in der Nähe.', icon: 'wave', cmd: '/winken' },
+    { name: 'Tanzen', desc: 'Tanzt, bis du dich bewegst.', icon: 'dance', cmd: '/tanzen' },
+    { name: 'Jubeln', desc: 'Jubelt laut.', icon: 'cheer', cmd: '/jubeln' },
+    { name: 'Lachen', desc: 'Lacht herzlich.', icon: 'laugh', cmd: '/lachen' },
+    { name: 'Hinsetzen', desc: 'Setzt sich auf den Boden.', icon: 'sit', cmd: '/sitzen' },
+    { name: 'Autolauf', desc: 'Läuft automatisch geradeaus (auch R / Num).', icon: 'run', run: true, gcd: false },
+  ];
+  const GCD = 1.5; // globale Abklingzeit wie in WoW
+  let gcdUntil = 0;
+  function buildActionBar() {
+    const box = $('abSlots'); box.innerHTML = '';
+    ACTIONS.forEach((a, i) => {
+      const b = document.createElement('button');
+      b.className = 'ab-slot' + (a ? '' : ' empty'); b.id = 'abSlot' + i;
+      b.setAttribute('aria-label', a ? `${a.name} (Taste ${i + 1})` : `Leerer Platz ${i + 1}`);
+      b.innerHTML = (a ? `<svg viewBox="0 0 24 24">${ICONS[a.icon] || ''}</svg>` : '') + `<span class="hk">${i + 1}</span><span class="cd"></span>`;
+      b.onclick = () => { useSlot(i); canvas.focus({ preventScroll: true }); };
+      b.onmouseenter = () => { if (!a) return; const t = document.createElement('div'); t.className = 'ab-tip'; t.innerHTML = '<b></b><span></span>'; t.querySelector('b').textContent = a.name; t.querySelector('span').textContent = a.desc; b.parentElement.parentElement.append(t); b._tip = t; const r = b.getBoundingClientRect(), pr = b.parentElement.parentElement.getBoundingClientRect(); t.style.left = (r.left + r.width / 2 - pr.left) + 'px'; };
+      b.onmouseleave = () => { if (b._tip) { b._tip.remove(); b._tip = null; } };
+      box.append(b);
+    });
+  }
+  function useSlot(i) {
+    const a = ACTIONS[i]; if (!a || mode !== 'play' || menuOpen || loadTasks.size) return;
+    const el = $('abSlot' + i); el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 120);
+    if (a.run) { autorun = !autorun; return; }
+    const now = performance.now() / 1000;
+    if (a.gcd !== false && now < gcdUntil) return; // noch in der Abklingzeit
+    if (a.gcd !== false) gcdUntil = now + GCD;
+    submitChat(a.cmd);
+  }
+  function updateActionBar() {
+    if (mode !== 'play') return;
+    const now = performance.now() / 1000, left = Math.max(0, gcdUntil - now);
+    ACTIONS.forEach((a, i) => {
+      const el = $('abSlot' + i); if (!el || !a) return;
+      const cd = el.lastElementChild;
+      if (a.gcd !== false && left > 0) {
+        const deg = (left / GCD) * 360;
+        cd.style.background = `conic-gradient(rgba(0,0,0,0.68) 0deg ${deg}deg, transparent ${deg}deg 360deg)`;
+      } else if (cd.style.background) cd.style.background = '';
+      el.classList.toggle('on', !!(a.run && autorun));
+    });
+  }
+  buildActionBar();
 
   // ---------- Spielmenü & Einstellungen ----------
   let menuOpen = false, worldLeft = false;
