@@ -28,7 +28,8 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .hud { position: fixed; z-index: 2; }
 .brand { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 .brand h1 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 22px; letter-spacing: 0.08em; color: var(--parch); text-shadow: 0 2px 8px rgba(0,0,0,.6); }
-.brand .ver { opacity: 0.75; }
+.ver { position: fixed; z-index: 2; left: max(8px, env(safe-area-inset-left, 0px)); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 10px var(--f-mono); color: var(--parch); opacity: 0.55; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
+.keys { margin-bottom: 14px; }
 .brand p { margin: 2px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 
 .panel { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 290px; max-height: calc(100% - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
@@ -134,10 +135,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud brand">
   <h1>Wanderfeld</h1>
   <p id="coords">x 0.0 · z 0.0</p>
-  <p class="ver">Version 03.11. 17:20</p>
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
+<p class="ver">v 03.11. 17:25</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
