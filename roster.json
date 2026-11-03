@@ -66,5 +66,12 @@
       "mn": 1,
       "an": 0
     }
+  },
+  "ui": {
+    "cap": null,
+    "bar": null,
+    "slot": "ui:slot:ui-quickslot2.png:575",
+    "hl": "ui:hl:buttonhilight-square.png:1132",
+    "ss": 1.8
   }
 }
