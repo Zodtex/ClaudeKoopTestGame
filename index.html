@@ -55,6 +55,10 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .minimap canvas { width: 170px; height: 170px; display: block; }
 .minimap .mmzone { font: 600 12px var(--f-display); letter-spacing: 0.08em; color: var(--gold); text-shadow: 0 1px 3px #000; max-width: 190px; text-align: center; }
 .minimap .mmzoom { position: absolute; right: -4px; bottom: 26px; display: flex; flex-direction: column; gap: 3px; }
+.sndpanel { position: absolute; right: 0; top: calc(100% + 6px); width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.sndpanel .field { grid-template-columns: 74px 1fr; }
+.sndnow { font: 11px var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+#sndBtn.muted { color: var(--err); text-decoration: line-through; }
 .minimap .mmzoom button { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(208,166,78,0.7); background: rgba(17,22,28,0.9); color: var(--parch); font: 600 13px/1 var(--f-mono); cursor: pointer; padding: 0; }
 .brand p { margin: 2px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 
@@ -182,7 +186,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud minimap" id="minimap" hidden>
   <canvas id="mmCanvas" width="340" height="340" aria-label="Minimap"></canvas>
   <div class="mmzone" id="mmZone">Übungsfeld</div>
-  <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
+  <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button><button id="sndBtn" title="Ton (M)" aria-label="Toneinstellungen" aria-expanded="false">♪</button></div>
+  <div class="sndpanel" id="sndPanel" hidden>
+    <div class="field"><label for="volMusic">Musik</label><input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5"></div>
+    <div class="field"><label for="volAmb">Umgebung</label><input type="range" id="volAmb" min="0" max="1" step="0.05" value="0.5"></div>
+    <label class="check"><input type="checkbox" id="volMute"> Stumm (Taste M)</label>
+    <div class="sndnow" id="sndNow">Keine Musik</div>
+  </div>
 </div>
 <div class="loadov" id="loadOv" hidden role="alertdialog" aria-live="polite" aria-labelledby="loadTitle">
   <div class="loadbox">
@@ -191,7 +201,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 22:20</p>
+<p class="ver">v 03.11. 22:45</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -317,6 +327,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 <div class="hud keys" id="keys" aria-label="Steuerung" hidden>
   <button class="keyshead" id="keysToggle" aria-expanded="true">Steuerung</button>
   <kbd>Enter</kbd><span>Chat · /tanzen, /winken …</span>
+  <kbd>M</kbd><span>Ton an/aus</span>
   <kbd>W / S</kbd><span>vor / rückwärts</span>
   <kbd>A / D</kbd><span>drehen</span>
   <kbd>Q / E</kbd><span>seitwärts</span>
@@ -364,6 +375,18 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       </div>
       <button class="btn ghost" id="waterHere">Auf meine Höhe setzen</button>
       <p class="hint">Stell dich ans Ufer und klick „Auf meine Höhe setzen". Wo das Wasser tiefer ist als die Figur, wird geschwommen – außer „Nicht schwimmen" ist an, dann ist dort eine unsichtbare Grenze. Im flachen Wasser kann man trotzdem waten.</p>
+    </div>
+    <div class="asec">
+      <span class="lbl">Musik &amp; Klang</span>
+      <div class="btnrow">
+        <button class="btn ghost" id="musicPick">Musik wählen</button>
+        <button class="btn ghost" id="ambPick">Umgebung wählen</button>
+      </div>
+      <input type="file" id="musicInput" multiple accept=".ogg,.mp3,.wav,audio/*" hidden>
+      <input type="file" id="ambInput" multiple accept=".ogg,.mp3,.wav,audio/*" hidden>
+      <div class="netstate" id="audioState">Keine Musik.</div>
+      <button class="btn ghost danger" id="audioClear">Musik &amp; Umgebung entfernen</button>
+      <p class="hint">In wow.export im Tab „Audio" z. B. nach „zonemusic/stranglethorn" (Musik) oder „ambience" (Vögel, Meer …) suchen und exportieren. Mehrere Dateien auf einmal wählen. Die Stücke laufen zufällig mit Pausen, die Umgebung in Schleife.</p>
     </div>
     <div class="asec">
       <span class="lbl">Himmel &amp; Licht</span>
@@ -561,6 +584,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (loadTasks.size) { e.preventDefault(); return; }
     if (typing() || mode !== 'play') return;
     if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === '/') { e.preventDefault(); openChat(e.key === '/' ? '/' : ''); return; }
+    if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
     if (e.code === 'NumLock' || e.code === 'KeyR') { if (!e.repeat) autorun = !autorun; }
     if (e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'ArrowUp' || e.code === 'ArrowDown') autorun = false;
     keys.add(e.code);
@@ -756,7 +780,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   });
   const base = n => decodeURIComponent(String(n).split('?')[0].split(/[\\/]/).pop()).toLowerCase();
 
-  const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g|csv)$/i;
+  const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g|csv|ogg|mp3|wav)$/i;
 
   // Lädt ein wow.export-Modell aus einer Dateiliste; Texturen werden über den Dateinamen zugeordnet
   async function parseModel(fileList) {
@@ -1111,6 +1135,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function enterPlay() {
     mode = 'play'; resetPlayer();
+    audioStart();
     $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false; $('chat').hidden = false; $('minimap').hidden = false;
     renderNameBar(); renderParty();
     canvas.focus();
@@ -1384,6 +1409,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       // Fehlende vorgegebene Charaktere bei Mitspielern anfragen (wer sie hat, schickt sie)
       if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) { waitFor(sl.mk); requestModel(msg.id, sl.mk); }
       if (mapCfg && !mapLoaded && !mapLoading) { waitFor(mapCfg.key); requestModel(msg.id, mapCfg.key); }
+      if (mapCfg && mapCfg.audio) for (const k of [mapCfg.audio.music, mapCfg.audio.amb]) if (k && !audioHave.has(k)) requestModel(msg.id, k);
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c || prev.ld !== msg.st.ld || prev.cn !== msg.st.cn) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
@@ -1410,7 +1436,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   // und speichern ihn in ihrem Browser.
   const requested = new Set(), incoming = new Map();
   const MAX_SHARE = 60 * 1024 * 1024, MAX_MAP = 600 * 1024 * 1024;
-  const limitFor = key => String(key).startsWith('map:') ? MAX_MAP : MAX_SHARE;
+  const limitFor = key => String(key).startsWith('map:') ? MAX_MAP : String(key).startsWith('audio:') ? 250 * 1024 * 1024 : MAX_SHARE;
 
   function netSendTo(id, msg, except) {
     if (!net.host) { netSend(msg); return; }
@@ -1459,13 +1485,15 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (inc.files[m.i]) return;
     inc.size += m.buf.byteLength; if (inc.size > limitFor(m.mk)) { incoming.delete(m.mk); endTask(m.mk); return; }
     const tot = Number.isFinite(m.tot) && m.tot > 0 ? m.tot : 0;
-    setTask(m.mk, `${labelFor(m.mk)} wird übertragen`, tot ? inc.size : inc.got + 1, tot || inc.n, tot ? `${(inc.size / 1048576).toFixed(1)} / ${(tot / 1048576).toFixed(1)} MB` : `${inc.got + 1} / ${inc.n} Dateien`);
+    if (m.mk.startsWith('audio:')) status(`Musik wird übertragen … ${inc.got + 1}/${inc.n}`);
+    else setTask(m.mk, `${labelFor(m.mk)} wird übertragen`, tot ? inc.size : inc.got + 1, tot || inc.n, tot ? `${(inc.size / 1048576).toFixed(1)} / ${(tot / 1048576).toFixed(1)} MB` : `${inc.got + 1} / ${inc.n} Dateien`);
     clearTimeout(inc.stall); inc.stall = setTimeout(() => { if (incoming.get(m.mk) === inc) { incoming.delete(m.mk); endTask(m.mk); } }, 30000);
     inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
     if (inc.got < inc.n) return;
     incoming.delete(m.mk); clearTimeout(inc.stall); endTask(m.mk);
     sharedPut(m.mk, inc.files);
     status(`${m.mk} empfangen und gespeichert.`, 'ok');
+    if (m.mk.startsWith('audio:')) { audioHave.add(m.mk); setupAudio(); }
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
     if (mapCfg && m.mk === mapCfg.key && !mapLoaded) loadMap(inc.files);
     if (rosterMode) {
@@ -1662,7 +1690,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const r = await fetch('roster.json', { cache: 'no-cache' });
       if (!r.ok) return null;
       const j = await r.json();
-      repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40), spawn: j.map.spawn, water: j.map.water, env: j.map.env } : null;
+      repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40), spawn: j.map.spawn, water: j.map.water, env: j.map.env, audio: j.map.audio } : null;
       const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
       return list;
     } catch (_) { return null; }
@@ -1949,10 +1977,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   async function setMapCfg(cfg, fromPeer) {
     const key = cfg && typeof cfg.key === 'string' && cfg.key.startsWith('map:') ? cfg.key.slice(0, 200) : null;
-    if (!key) { if (mapCfg) { mapCfg = null; unloadMap(); } mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); return; }
+    if (!key) { if (mapCfg) { mapCfg = null; unloadMap(); } mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); setupAudio(); return; }
     const same = mapCfg && mapCfg.key === key;
-    mapCfg = { key, name: String(cfg.name || 'Karte').slice(0, 40), spawn: cleanSpawn(cfg.spawn), water: cleanWater(cfg.water), env: cleanEnv(cfg.env) };
-    renderMapAdmin();
+    mapCfg = { key, name: String(cfg.name || 'Karte').slice(0, 40), spawn: cleanSpawn(cfg.spawn), water: cleanWater(cfg.water), env: cleanEnv(cfg.env), audio: cleanAudio(cfg.audio) };
+    renderMapAdmin(); setupAudio();
     if (same && mapLoaded) { applySpawn(); applyEnv(); updateWater(); return; }
     if (same && mapLoading) return;
     if (!same && mapLoaded) unloadMap();
@@ -1993,7 +2021,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     mapMsg(`Startpunkt gesetzt (x ${mapCfg.spawn[0].toFixed(0)} · z ${mapCfg.spawn[1].toFixed(0)}). Für alle mit „Dauerhaft speichern".`, 'ok');
     broadcastMap();
   };
-  $('mapClear').onclick = () => { mapCfg = null; unloadMap(); mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); broadcastMap(); };
+  $('mapClear').onclick = () => { mapCfg = null; unloadMap(); mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); setupAudio(); broadcastMap(); };
 
   // ---------- Wasser ----------
   let water = null, waterTex = null, mapTop = 100;
@@ -2091,6 +2119,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function updateEnvFrame(dt) {
     const wl = waterLevel(), under = wl !== null && camera.position.y < wl;
+    audioUnderwater(under);
     scene.background.copy(under ? deepCol : skyCol);
     scene.fog.color.copy(under ? deepCol : skyCol);
     scene.fog.near = under ? 0 : fogNear; scene.fog.far = under ? 45 : fogFar;
@@ -2228,6 +2257,115 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!moved) break;
     }
   }
+
+  // ---------- Musik & Umgebungsgeräusche ----------
+  const audioHave = new Set();
+  const cleanAudio = a => {
+    if (!a || typeof a !== 'object') return null;
+    const k = v => typeof v === 'string' && v.startsWith('audio:') ? v.slice(0, 220) : null;
+    const out = { music: k(a.music), amb: k(a.amb), mn: Number.isInteger(a.mn) ? a.mn : 0, an: Number.isInteger(a.an) ? a.an : 0 };
+    return out.music || out.amb ? out : null;
+  };
+  const AU = { ctx: null, music: null, amb: null, gM: null, gA: null, filt: null, started: false, list: [], ambList: [], urls: [], next: 0, timer: 0, under: false, keyM: null, keyA: null };
+  let vol = { music: 0.5, amb: 0.5, mute: false };
+  try { vol = Object.assign(vol, JSON.parse(localStorage.getItem('wf-vol') || '{}')); } catch (_) {}
+  function saveVol() { try { localStorage.setItem('wf-vol', JSON.stringify(vol)); } catch (_) {} }
+  function applyVol() {
+    if (AU.gM) { AU.gM.gain.setTargetAtTime(vol.mute ? 0 : vol.music * 0.8, AU.ctx.currentTime, 0.2); AU.gA.gain.setTargetAtTime(vol.mute ? 0 : vol.amb * 0.7, AU.ctx.currentTime, 0.2); }
+    $('volMusic').value = vol.music; $('volAmb').value = vol.amb; $('volMute').checked = vol.mute;
+    $('sndBtn').classList.toggle('muted', vol.mute);
+  }
+  function audioStart() {
+    // Muss aus einem Klick heraus passieren (Browser-Regel), daher beim „Spielen"
+    if (!AU.ctx) {
+      try {
+        const C = window.AudioContext || window.webkitAudioContext; AU.ctx = new C();
+        AU.filt = AU.ctx.createBiquadFilter(); AU.filt.type = 'lowpass'; AU.filt.frequency.value = 22000;
+        AU.gM = AU.ctx.createGain(); AU.gA = AU.ctx.createGain();
+        AU.gM.connect(AU.filt); AU.gA.connect(AU.filt); AU.filt.connect(AU.ctx.destination);
+        AU.music = new Audio(); AU.amb = new Audio(); AU.amb.loop = true;
+        AU.ctx.createMediaElementSource(AU.music).connect(AU.gM);
+        AU.ctx.createMediaElementSource(AU.amb).connect(AU.gA);
+        AU.music.onended = () => scheduleNext(20000 + Math.random() * 40000); // Pause zwischen Stücken wie in WoW
+        AU.amb.onended = () => playAmb();
+      } catch (e) { console.warn('Audio', e); return; }
+    }
+    if (AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
+    AU.started = true; applyVol();
+    if (AU.list.length && AU.music.paused && !AU.timer) playNext();
+    if (AU.ambList.length && AU.amb.paused) playAmb();
+  }
+  function scheduleNext(ms) { clearTimeout(AU.timer); AU.timer = setTimeout(() => { AU.timer = 0; playNext(); }, ms); }
+  function playNext() {
+    if (!AU.started || !AU.list.length) return;
+    let i = Math.floor(Math.random() * AU.list.length);
+    if (AU.list.length > 1 && i === AU.last) i = (i + 1) % AU.list.length;
+    AU.last = i;
+    AU.music.src = AU.list[i].url; AU.music.play().catch(() => {});
+    $('sndNow').textContent = '♪ ' + AU.list[i].name;
+  }
+  function playAmb() {
+    if (!AU.started || !AU.ambList.length) return;
+    const it = AU.ambList[Math.floor(Math.random() * AU.ambList.length)];
+    AU.amb.loop = AU.ambList.length === 1; AU.amb.src = it.url; AU.amb.play().catch(() => {});
+  }
+  function stopAudio() {
+    clearTimeout(AU.timer); AU.timer = 0;
+    if (AU.music) { AU.music.pause(); AU.music.removeAttribute('src'); }
+    if (AU.amb) { AU.amb.pause(); AU.amb.removeAttribute('src'); }
+    $('sndNow').textContent = 'Keine Musik';
+  }
+  // Admin-Auswahl oder empfangene Dateien → Wiedergabeliste aufbauen
+  async function setupAudio() {
+    const a = mapCfg && mapCfg.audio;
+    const km = a && a.music, ka = a && a.amb;
+    if (km === AU.keyM && ka === AU.keyA && (AU.list.length || !km || !audioHave.has(km)) && (AU.ambList.length || !ka || !audioHave.has(ka))) { renderAudioAdmin(); return; }
+    const fm = km ? await sharedGet(km) : null, fa = ka ? await sharedGet(ka) : null;
+    if (fm) audioHave.add(km); if (fa) audioHave.add(ka);
+    stopAudio(); AU.urls.forEach(URL.revokeObjectURL); AU.urls = [];
+    const mk = files => (files || []).filter(f => /\.(ogg|mp3|wav)$/i.test(f.name)).map(f => { const url = URL.createObjectURL(f); AU.urls.push(url); return { url, name: f.name.replace(/\.[^.]+$/, '') }; });
+    AU.list = mk(fm); AU.ambList = mk(fa); AU.keyM = km; AU.keyA = ka;
+    renderAudioAdmin();
+    if (AU.started) { if (AU.list.length) playNext(); if (AU.ambList.length) playAmb(); }
+  }
+  function audioUnderwater(under) {
+    if (!AU.filt || under === AU.under) return;
+    AU.under = under; AU.filt.frequency.setTargetAtTime(under ? 500 : 22000, AU.ctx.currentTime, 0.15);
+  }
+  function toggleMute() { vol.mute = !vol.mute; saveVol(); applyVol(); }
+  function audioKey(kind, files) {
+    const names = files.map(f => base(f.name)).sort();
+    return `audio:${kind}:` + names.join('+').slice(0, 150) + ':' + files.reduce((a, f) => a + f.size, 0);
+  }
+  function renderAudioAdmin() {
+    const a = mapCfg && mapCfg.audio, has = !!mapCfg;
+    ['musicPick', 'ambPick', 'audioClear'].forEach(id => $(id).disabled = !has);
+    const e = $('audioState');
+    if (!has) { e.textContent = 'Erst eine Karte laden.'; e.className = 'netstate'; return; }
+    if (!a) { e.textContent = 'Keine Musik.'; e.className = 'netstate'; return; }
+    e.textContent = `${a.mn || AU.list.length} Musikstück${(a.mn || AU.list.length) === 1 ? '' : 'e'} · ${a.an || AU.ambList.length} ${(a.an || AU.ambList.length) === 1 ? 'Umgebungsklang' : 'Umgebungsklänge'}`;
+    e.className = 'netstate ok';
+  }
+  async function pickAudio(kind, list) {
+    const files = [...list].filter(f => /\.(ogg|mp3|wav)$/i.test(f.name));
+    if (!files.length || !mapCfg || !isAdmin) { $('audioState').textContent = 'Keine .ogg/.mp3-Dateien gewählt.'; $('audioState').className = 'netstate err'; return; }
+    const key = audioKey(kind, files);
+    sharedPut(key, files); audioHave.add(key);
+    mapCfg.audio = Object.assign({ music: null, amb: null, mn: 0, an: 0 }, mapCfg.audio, kind === 'music' ? { music: key, mn: files.length } : { amb: key, an: files.length });
+    AU.keyM = AU.keyA = undefined; // neu aufbauen
+    await setupAudio(); broadcastMap();
+    if (!AU.started) { $('audioState').textContent += ' · startet beim nächsten „Spielen"'; }
+  }
+  $('musicPick').onclick = () => $('musicInput').click();
+  $('ambPick').onclick = () => $('ambInput').click();
+  $('musicInput').onchange = e => { pickAudio('music', e.target.files); e.target.value = ''; };
+  $('ambInput').onchange = e => { pickAudio('amb', e.target.files); e.target.value = ''; };
+  $('audioClear').onclick = () => { if (!mapCfg) return; mapCfg.audio = null; AU.keyM = AU.keyA = undefined; setupAudio(); broadcastMap(); };
+  $('sndBtn').onclick = () => { const p = $('sndPanel'); p.hidden = !p.hidden; $('sndBtn').setAttribute('aria-expanded', String(!p.hidden)); };
+  $('volMusic').oninput = e => { vol.music = +e.target.value; saveVol(); applyVol(); };
+  $('volAmb').oninput = e => { vol.amb = +e.target.value; saveVol(); applyVol(); };
+  $('volMute').onchange = e => { vol.mute = e.target.checked; saveVol(); applyVol(); };
+  applyVol(); renderAudioAdmin();
 
   // ---------- Ladebalken ----------
   const loadTasks = new Map(), waitTimers = new Map();
@@ -2594,6 +2732,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (mapCfg.spawn) out.map.spawn = mapCfg.spawn;
       if (mapCfg.water) out.map.water = mapCfg.water;
       if (mapCfg.env) out.map.env = mapCfg.env;
+      if (mapCfg.audio) out.map.audio = mapCfg.audio;
     }
     return JSON.stringify(out, null, 2);
   }
