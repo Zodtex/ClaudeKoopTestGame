@@ -138,7 +138,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 17:30</p>
+<p class="ver">v 03.11. 18:00</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -273,6 +273,17 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <p class="hint">Name und wow.export-Pfad eintragen (z. B. creature/dragonwhelp/dragonwhelptarecgosa.m2), dann deinen Exportordner wählen. Speichern für alle mit „Dauerhaft speichern".</p>
     </div>
     <div class="asec">
+      <span class="lbl">Karte</span>
+      <input type="text" id="mapName" maxlength="40" placeholder="Name der Karte, z. B. Wald von Elwynn" autocomplete="off">
+      <div class="btnrow">
+        <button class="btn ghost" id="mapFolder">Kartenordner wählen</button>
+        <button class="btn ghost danger" id="mapClear">Entfernen</button>
+      </div>
+      <input type="file" id="mapInput" webkitdirectory multiple hidden>
+      <div class="netstate" id="mapState">Keine Karte. Es gilt das Übungsfeld.</div>
+      <p class="hint">In wow.export unter „Maps" Kacheln markieren und als OBJ exportieren. Wähle dann den Ordner mit den adt_…obj-Dateien. Speichern für alle mit „Dauerhaft speichern".</p>
+    </div>
+    <div class="asec">
       <span class="lbl">Animation abspielen</span>
       <select id="emoteSel" aria-label="Animation"><option value="">– Modell laden –</option></select>
       <div class="btnrow">
@@ -333,7 +344,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   scene.background = new THREE.Color(SKY);
   scene.fog = new THREE.Fog(SKY, 40, 140);
 
-  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
 
   scene.add(new THREE.HemisphereLight(0xdfe9f2, 0x4a5a3a, 0.75));
   const sun = new THREE.DirectionalLight(0xfff1d6, 1.1);
@@ -366,6 +377,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   scene.add(ground);
 
   // Orientierungspunkte: Steine und Säulen
+  const propsGroup = new THREE.Group(); scene.add(propsGroup);
   (function props() {
     let s = 42; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
     const stone = new THREE.MeshLambertMaterial({ color: 0x8a8578 });
@@ -377,13 +389,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       m.position.set(Math.cos(a) * d, r * 0.45, Math.sin(a) * d);
       m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
       m.scale.y = 0.6 + rnd() * 0.5;
-      m.castShadow = m.receiveShadow = true; scene.add(m);
+      m.castShadow = m.receiveShadow = true; propsGroup.add(m);
     }
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       const p = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 5 + (i % 3) * 1.5, 8), stone);
       p.position.set(Math.cos(a) * 16, p.geometry.parameters.height / 2, Math.sin(a) * 16);
-      p.castShadow = p.receiveShadow = true; scene.add(p);
+      p.castShadow = p.receiveShadow = true; propsGroup.add(p);
     }
   })();
 
@@ -529,13 +541,22 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       moveState = !moving ? 'idle' : fwd < 0 ? 'back' : fwd === 0 ? (str > 0 ? 'sl' : 'sr') : 'run';
       if ((moveState === 'sl' && acts.sl) || (moveState === 'sr' && acts.sr)) leanTarget = 0; // eigene Seitwärts-Animation: nicht drehen
     }
+    const ox = player.position.x, oz = player.position.z;
     player.position.addScaledVector(vel, dt);
+    if (mapIndex) {
+      // Nicht über den Kartenrand oder in Löcher laufen
+      if (groundAt(player.position.x, player.position.z) === null) { player.position.x = ox; player.position.z = oz; }
+    } else {
+      player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
+      player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
+    }
+    const gnd = mapIndex ? (groundAt(player.position.x, player.position.z) ?? player.position.y) : 0;
     velY -= MOVE.g * dt;
     player.position.y += velY * dt;
-    if (player.position.y <= 0) { player.position.y = 0; velY = 0; onGround = true; }
+    if (player.position.y <= gnd) { player.position.y = gnd; velY = 0; onGround = true; }
+    else if (onGround && velY <= 0 && player.position.y - gnd < 1.2) { player.position.y = gnd; velY = 0; } // Hang hinunter
+    else onGround = false;
     if (!onGround) moveState = 'jump';
-    player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
-    player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
     player.rotation.y = facing;
 
     let dl = leanTarget - lean; lean += dl * Math.min(1, dt * 10);
@@ -567,12 +588,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       Math.max(0.3, ty + Math.sin(cp) * cd),
       tz - Math.cos(camYaw) * Math.cos(cp) * cd
     );
+    if (mapIndex) { const ch = groundAt(camera.position.x, camera.position.z); if (ch !== null && camera.position.y < ch + 0.6) camera.position.y = ch + 0.6; }
     camera.lookAt(tx, ty, tz);
 
-    sun.position.set(player.position.x + 20, 40, player.position.z + 12);
+    sun.position.set(player.position.x + 20, player.position.y + 40, player.position.z + 12);
     sun.target.position.copy(player.position);
 
-    $('coords').textContent = `x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
+    $('coords').textContent = `${mapLoaded && mapCfg ? mapCfg.name + ' · ' : ''}x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
 
     coopUpdate(dt);
     resize();
@@ -939,7 +961,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
 
   function resetPlayer() {
-    player.position.set(0, 0, 0); facing = 0; camOff = 0; pitch = 0.3;
+    player.position.set(spawn.x, spawn.y, spawn.z); facing = 0; camOff = 0; pitch = 0.3;
     vel.set(0, 0, 0); velY = 0; onGround = true; lean = leanTarget = 0; moveState = 'idle';
   }
   function enterPlay() {
@@ -1196,9 +1218,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       syncPeer({ peer: msg.id, sameTab: false, kind: 'viewer', guest: false, presence: msg.st });
       // Fehlende vorgegebene Charaktere bei Mitspielern anfragen (wer sie hat, schickt sie)
       if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) requestModel(msg.id, sl.mk);
+      if (mapCfg && !mapLoaded && !mapLoading) requestModel(msg.id, mapCfg.key);
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
+    } else if (msg.t === 'map') {
+      if (!net.host) setMapCfg(msg.map, msg.id);
     } else if (msg.t === 'cfg') {
       if (!net.host && rosterSource === 'repo') applyCfg(msg.mk, msg.settings);
     } else if (msg.t === 'roster') {
@@ -1214,7 +1239,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   // Jeder lädt nur seinen eigenen Charakter; die anderen bekommen ihn beim ersten Treffen automatisch
   // und speichern ihn in ihrem Browser.
   const requested = new Set(), incoming = new Map();
-  const MAX_SHARE = 60 * 1024 * 1024;
+  const MAX_SHARE = 60 * 1024 * 1024, MAX_MAP = 600 * 1024 * 1024;
+  const limitFor = key => String(key).startsWith('map:') ? MAX_MAP : MAX_SHARE;
 
   function netSendTo(id, msg, except) {
     if (!net.host) { netSend(msg); return; }
@@ -1234,7 +1260,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function requestModel(fromId, key) {
     const tag = fromId + '|' + key;
-    if (!net.ready || !key || requested.has(tag)) return;
+    if (!net.ready || !key || requested.has(tag) || incoming.has(key)) return;
     requested.add(tag);
     setTimeout(() => requested.delete(tag), 8000); // nach 8 s darf erneut gefragt werden
     netSendTo(fromId, { t: 'req', id: net.id, to: fromId, mk: key });
@@ -1249,25 +1275,26 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     let total = 0;
     for (let i = 0; i < files.length; i++) {
       const buf = await files[i].arrayBuffer();
-      total += buf.byteLength; if (total > MAX_SHARE) return;
+      total += buf.byteLength; if (total > limitFor(key)) return;
       netSendTo(toId, { t: 'f', id: net.id, to: toId, mk: key, i, n: files.length, name: files[i].name, buf });
     }
   }
   function receiveFile(m) {
     if (m && ArrayBuffer.isView(m.buf)) m.buf = m.buf.buffer.slice(m.buf.byteOffset, m.buf.byteOffset + m.buf.byteLength);
     if (typeof m.mk !== 'string' || typeof m.name !== 'string' || !MODEL_EXT.test(m.name) || !(m.buf instanceof ArrayBuffer)) return;
-    if (!Number.isInteger(m.n) || m.n < 1 || m.n > 400 || !Number.isInteger(m.i) || m.i < 0 || m.i >= m.n) return;
+    if (!Number.isInteger(m.n) || m.n < 1 || m.n > 2000 || !Number.isInteger(m.i) || m.i < 0 || m.i >= m.n) return;
     let inc = incoming.get(m.mk);
     if (!inc || inc.n !== m.n) { inc = { n: m.n, files: new Array(m.n), got: 0, size: 0 }; incoming.set(m.mk, inc); }
     if (inc.files[m.i]) return;
     status(`Empfange ${m.mk} … ${inc.got + 1}/${inc.n} Dateien`);
-    inc.size += m.buf.byteLength; if (inc.size > MAX_SHARE) { incoming.delete(m.mk); return; }
+    inc.size += m.buf.byteLength; if (inc.size > limitFor(m.mk)) { incoming.delete(m.mk); return; }
     inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
     if (inc.got < inc.n) return;
     incoming.delete(m.mk);
     sharedPut(m.mk, inc.files);
     status(`${m.mk} empfangen und gespeichert.`, 'ok');
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
+    if (mapCfg && m.mk === mapCfg.key && !mapLoaded) loadMap(inc.files);
     if (rosterMode) {
       slots.forEach(sl => { if (sl && sl.mk === m.mk) sl.files = inc.files; });
       renderSlots();
@@ -1329,7 +1356,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     conn.on('open', () => {
       net.conns.add(conn); net.ready = true; lastSent = '';
       if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() });
-        if (isAdmin && rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings }); } // Neuankömmling bekommt alle bekannten Stände
+        if (isAdmin && rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings });
+        if (isAdmin) conn.send({ t: 'map', id: net.id, map: mapCfg }); } // Neuankömmling bekommt alle bekannten Stände
       else { netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok'); if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); } }
       if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
@@ -1408,6 +1436,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const r = await fetch('roster.json', { cache: 'no-cache' });
       if (!r.ok) return null;
       const j = await r.json();
+      repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40) } : null;
       const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
       return list;
     } catch (_) { return null; }
@@ -1481,6 +1510,171 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     else if (missing.length) { e.textContent = `Gefunden: ${found.join(', ') || 'nichts'}. Nicht gefunden: ${missing.join(', ')}. Prüfe den Pfad oder exportiere als glTF.`; e.className = 'netstate err'; }
     else { e.textContent = `Alle gefunden: ${found.join(', ')}.`; e.className = 'netstate ok'; }
   }
+
+  // ---------- Karte aus wow.export (ADT-Kacheln als OBJ) ----------
+  let mapCfg = null, mapLoaded = false, mapLoading = false, mapGroup = null, mapIndex = null, mapUrls = [];
+  let repoMap = null;
+  const spawn = new THREE.Vector3(0, 0, 0);
+  function mapMsg(t, k = '') { const e = $('mapState'); e.textContent = t; e.className = 'netstate ' + k; }
+
+  // Höhenabfrage: Dreiecke der Karte in ein 2D-Raster einsortieren, damit jede Abfrage nur wenige prüft
+  function buildIndex(root) {
+    const CELL = 8, tris = [], cells = new Map();
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    root.updateMatrixWorld(true);
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      const pos = o.geometry.attributes.position, idx = o.geometry.index, mw = o.matrixWorld;
+      const n = idx ? idx.count : pos.count;
+      for (let i = 0; i < n; i += 3) {
+        const i0 = idx ? idx.getX(i) : i, i1 = idx ? idx.getX(i + 1) : i + 1, i2 = idx ? idx.getX(i + 2) : i + 2;
+        a.fromBufferAttribute(pos, i0).applyMatrix4(mw); b.fromBufferAttribute(pos, i1).applyMatrix4(mw); c.fromBufferAttribute(pos, i2).applyMatrix4(mw);
+        const t = tris.length / 9;
+        tris.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+        const x0 = Math.floor(Math.min(a.x, b.x, c.x) / CELL), x1 = Math.floor(Math.max(a.x, b.x, c.x) / CELL);
+        const z0 = Math.floor(Math.min(a.z, b.z, c.z) / CELL), z1 = Math.floor(Math.max(a.z, b.z, c.z) / CELL);
+        for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+          const k = x * 100003 + z; let arr = cells.get(k); if (!arr) cells.set(k, arr = []); arr.push(t);
+        }
+        minX = Math.min(minX, a.x, b.x, c.x); maxX = Math.max(maxX, a.x, b.x, c.x);
+        minZ = Math.min(minZ, a.z, b.z, c.z); maxZ = Math.max(maxZ, a.z, b.z, c.z);
+      }
+    });
+    return { CELL, tris: new Float32Array(tris), cells, minX, maxX, minZ, maxZ };
+  }
+  function groundAt(x, z) {
+    const I = mapIndex; if (!I) return 0;
+    const arr = I.cells.get(Math.floor(x / I.CELL) * 100003 + Math.floor(z / I.CELL)); if (!arr) return null;
+    const T = I.tris; let best = null;
+    for (const t of arr) {
+      const o = t * 9;
+      const ax = T[o], az = T[o + 2], bx = T[o + 3], bz = T[o + 5], cx = T[o + 6], cz = T[o + 8];
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(d) < 1e-9) continue;
+      const w1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+      const w2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+      const w3 = 1 - w1 - w2;
+      if (w1 < -1e-4 || w2 < -1e-4 || w3 < -1e-4) continue;
+      const y = w1 * T[o + 1] + w2 * T[o + 4] + w3 * T[o + 7];
+      if (best === null || y > best) best = y;
+    }
+    return best;
+  }
+
+  const isTile = f => /^adt_\d+_\d+\.obj$/i.test(f.name);
+  function mapKeyFor(files) {
+    const tiles = files.filter(isTile).map(f => base(f.name).replace(/\.obj$/, '')).sort();
+    return 'map:' + (tiles.join('+') || 'karte').slice(0, 190);
+  }
+  // Nur die Dateien, die die Kacheln brauchen: OBJ, MTL und die Texturen aus den MTL-Dateien
+  async function pickMapFiles(fileList) {
+    const files = [...fileList];
+    let tiles = files.filter(isTile);
+    if (!tiles.length) tiles = files.filter(f => /\.obj$/i.test(f.name));
+    const out = new Set(tiles);
+    for (const t of tiles) {
+      const stem = base(t.name).replace(/\.obj$/, '');
+      const mtl = files.find(f => base(f.name) === stem + '.mtl'); if (!mtl) continue;
+      out.add(mtl);
+      const txt = await mtl.text();
+      for (const line of txt.split(/\r?\n/)) {
+        const m = line.trim().match(/^map_\w+\s+(?:-\S+\s+\S+\s+)*(.+)$/i); if (!m) continue;
+        const want = base(m[1].trim()); const hit = files.find(f => base(f.name) === want); if (hit) out.add(hit);
+      }
+    }
+    return [...out];
+  }
+
+  async function loadMap(fileList) {
+    if (mapLoading) return; mapLoading = true;
+    mapMsg('Lade Karte …');
+    try {
+      const files = [...fileList];
+      const tiles = files.filter(isTile).length ? files.filter(isTile) : files.filter(f => /\.obj$/i.test(f.name));
+      if (!tiles.length) throw new Error('Keine adt_…obj-Dateien gefunden');
+      const urls = [], map = {};
+      for (const f of files) { const u = URL.createObjectURL(f); urls.push(u); map[base(f.name)] = u; }
+      const own = new Set(urls);
+      const manager = new THREE.LoadingManager();
+      manager.setURLModifier(url => (url.startsWith('data:') || own.has(url)) ? url : (map[base(url)] || url));
+      const group = new THREE.Group();
+      for (const t of tiles) {
+        const stem = base(t.name).replace(/\.obj$/, '');
+        const loader = new THREE.OBJLoader(manager);
+        if (map[stem + '.mtl']) { const mats = await new THREE.MTLLoader(manager).loadAsync(map[stem + '.mtl']); mats.preload(); loader.setMaterials(mats); }
+        const obj = await loader.loadAsync(map[base(t.name)]);
+        obj.traverse(o => {
+          if (!o.isMesh) return;
+          o.receiveShadow = true; o.castShadow = false;
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) m.map.encoding = THREE.sRGBEncoding; m.side = THREE.DoubleSide; if (m.specular) m.specular.setScalar(0); m.needsUpdate = true; });
+        });
+        group.add(obj);
+      }
+      // Karte um den Ursprung zentrieren, tiefster Punkt auf Höhe 0
+      const box = new THREE.Box3().setFromObject(group), ctr = box.getCenter(new THREE.Vector3());
+      group.position.set(-ctr.x, -box.min.y, -ctr.z);
+      unloadMap(false);
+      mapGroup = group; mapUrls = urls; scene.add(group);
+      mapIndex = buildIndex(group);
+      propsGroup.visible = false; ground.visible = false;
+      scene.fog.near = 180; scene.fog.far = 1400;
+      // Startpunkt: Mitte der Karte, sonst spiralförmig die nächste begehbare Stelle
+      let found = null;
+      for (let r = 0; r < 600 && !found; r += 8) for (let a = 0; a < Math.PI * 2 && !found; a += r ? 8 / r : 7) {
+        const x = Math.cos(a) * r, z = Math.sin(a) * r, y = groundAt(x, z); if (y !== null) found = [x, y, z];
+      }
+      spawn.set(...(found || [0, 0, 0]));
+      mapLoaded = true;
+      if (mode !== 'play' || !found || groundAt(player.position.x, player.position.z) === null) resetPlayer();
+      mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}.`, 'ok');
+    } catch (e) {
+      console.error(e); mapMsg(`Karte konnte nicht geladen werden: ${e.message || e}`, 'err');
+    } finally { mapLoading = false; }
+  }
+  function unloadMap(restore = true) {
+    if (mapGroup) { scene.remove(mapGroup); disposeModel(mapGroup); }
+    mapUrls.forEach(URL.revokeObjectURL);
+    mapGroup = null; mapIndex = null; mapUrls = []; mapLoaded = false;
+    if (restore) {
+      propsGroup.visible = true; ground.visible = true;
+      scene.fog.near = 40; scene.fog.far = 140;
+      spawn.set(0, 0, 0); resetPlayer();
+    }
+  }
+  async function setMapCfg(cfg, fromPeer) {
+    const key = cfg && typeof cfg.key === 'string' && cfg.key.startsWith('map:') ? cfg.key.slice(0, 200) : null;
+    if (!key) { if (mapCfg) { mapCfg = null; unloadMap(); } mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); return; }
+    const same = mapCfg && mapCfg.key === key;
+    mapCfg = { key, name: String(cfg.name || 'Karte').slice(0, 40) };
+    renderMapAdmin();
+    if (same && (mapLoaded || mapLoading)) return;
+    if (!same && mapLoaded) unloadMap();
+    const files = await sharedGet(key);
+    if (files) loadMap(files);
+    else if (fromPeer && net.ready) { mapMsg('Karte wird vom Admin übertragen …'); requestModel(fromPeer, key); }
+    else mapMsg('Karte fehlt noch. Tritt dem Spiel des Admins bei, dann kommt sie automatisch.');
+  }
+  function renderMapAdmin() {
+    if (document.activeElement !== $('mapName')) $('mapName').value = mapCfg ? mapCfg.name : '';
+  }
+  function broadcastMap() { if (net.host && net.ready) netSend({ t: 'map', id: net.id, map: mapCfg }); }
+
+  $('mapFolder').onclick = () => $('mapInput').click();
+  $('mapInput').onchange = async e => {
+    const all = [...e.target.files]; e.target.value = '';
+    if (!isAdmin) return;
+    mapMsg('Durchsuche Kartenordner …');
+    const files = await pickMapFiles(all);
+    if (!files.some(f => /\.obj$/i.test(f.name))) { mapMsg('Keine adt_…obj-Dateien gefunden. Exportiere die Kacheln in wow.export als OBJ.', 'err'); return; }
+    const key = mapKeyFor(files);
+    sharedPut(key, files);
+    unloadMap(false); mapLoaded = false;
+    mapCfg = { key, name: ($('mapName').value.trim() || 'Karte').slice(0, 40) };
+    await loadMap(files);
+    broadcastMap();
+  };
+  $('mapName').onchange = () => { if (mapCfg) { mapCfg.name = $('mapName').value.trim().slice(0, 40) || 'Karte'; broadcastMap(); } };
+  $('mapClear').onclick = () => { mapCfg = null; unloadMap(); mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); broadcastMap(); };
 
   // ---------- Admin-Funktionen ----------
   let emote = null, emoteAct = null;
@@ -1581,7 +1775,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       ANIM_KEYS.forEach(k => { if (st[k] !== undefined) o[k] = st[k]; });
       return o;
     });
-    return JSON.stringify({ _hinweis: 'Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.', characters }, null, 2);
+    const out = { _hinweis: 'Nur Pfade und Einstellungen. Modelle und Karte kommen aus der eigenen WoW-Installation bzw. vom Admin.', characters };
+    if (mapCfg) out.map = { name: mapCfg.name, key: mapCfg.key };
+    return JSON.stringify(out, null, 2);
   }
   function showAdmin() {
     $('adminBtn').hidden = !isAdmin;
@@ -1655,6 +1851,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     slots = await dbLoad();
     repoRoster = (await fetchRoster()) || [];
     await enterRepoRoster(repoRoster); // Charaktere legt nur der Admin fest
+    if (repoMap) setMapCfg(repoMap, null);
     const first = slots.findIndex(sl => sl && sl.files && sl.files.length);
     enterSelect();
     activateSlot(first >= 0 ? first : 0);
