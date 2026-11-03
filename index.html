@@ -191,7 +191,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 21:20</p>
+<p class="ver">v 03.11. 21:30</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -2096,18 +2096,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       // Stamm finden: Pro Richtung (24 Sektoren) den innersten Schnittpunkt nehmen. Blätter, Äste und Wurzeln
       // liegen weiter außen und werden so ignoriert. Zweimal nachzentrieren, damit auch schiefe Stämme passen.
       let cx = wp.x, cz = wp.z, r = 0, ok = false;
+      // Suchradius nach Objektgröße: riesige Dschungelbäume haben Stämme mit 5–10 Yards Radius
+      const searchR = Math.max(8, 0.6 * Math.max(box.max.x - box.min.x, box.max.z - box.min.z));
       for (let it = 0; it < 3; it++) {
         const SEC = 24, best = new Array(SEC).fill(Infinity), bx = new Array(SEC), bz = new Array(SEC);
         for (let i = 0; i < pts.length; i += 2) {
           const dx = pts[i] - cx, dz = pts[i + 1] - cz, d = Math.hypot(dx, dz);
-          if (d > 8) continue;
+          if (d > searchR) continue;
           const k = Math.floor(((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI)) * SEC) % SEC;
           if (d < best[k]) { best[k] = d; bx[k] = pts[i]; bz[k] = pts[i + 1]; }
         }
         const hit = []; for (let k = 0; k < SEC; k++) if (best[k] < Infinity) hit.push(k);
         if (hit.length < 6) { ok = false; break; }
         const ds = hit.map(k => best[k]).sort((x, y) => x - y);
-        r = ds[Math.floor(ds.length / 2)];
+        r = ds[Math.floor(ds.length * 0.65)];
         ok = true;
         if (it < 2) { let sx = 0, sz = 0; for (const k of hit) { sx += bx[k]; sz += bz[k]; } cx = sx / hit.length; cz = sz / hit.length; }
       }
@@ -2119,7 +2121,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         const ds = []; for (let i = 0; i < pts.length; i += 2) ds.push(Math.hypot(pts[i] - cx, pts[i + 1] - cz));
         ds.sort((x, y) => x - y); r = ds[Math.floor(ds.length * 0.85)];
       }
-      if (r > 5) continue;
+      if (r > 15) continue;
       r = Math.max(0.12, r);
       const i = list.length; list.push({ x: cx, z: cz, y: base, top: box.max.y, r });
       const x0 = Math.floor((cx - r) / CELL), x1 = Math.floor((cx + r) / CELL), z0 = Math.floor((cz - r) / CELL), z1 = Math.floor((cz + r) / CELL);
