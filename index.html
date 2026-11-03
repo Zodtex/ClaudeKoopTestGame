@@ -75,6 +75,12 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 .party .mem i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .party .mem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .party .mem small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 10.5px; flex: none; }
+.adminbtn { right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); background: rgba(208,166,78,0.22); color: var(--parch); border: 1px solid var(--gold); border-radius: 4px; padding: 7px 14px; font: 600 12px var(--f-display); letter-spacing: 0.1em; cursor: pointer; }
+.adminpanel { top: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); width: 300px; max-height: calc(100% - 90px); border-color: rgba(208,166,78,0.55); z-index: 3; }
+.asec { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.asec .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+textarea { width: 100%; background: #1b2229; color: var(--parch); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font: 11px/1.45 var(--f-mono); resize: vertical; }
+a.btn { text-decoration: none; display: inline-block; }
 .coop { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 .coop .lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .joinrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
@@ -205,6 +211,39 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <kbd>Num / R</kbd><span>Autolauf</span>
   <kbd>Leertaste</kbd><span>springen</span>
 </div>
+
+<button class="hud adminbtn" id="adminBtn" hidden>Admin</button>
+<aside class="hud panel adminpanel" id="adminPanel" hidden>
+  <header>
+    <h2>Admin</h2>
+    <button class="iconbtn" id="adminClose">schließen</button>
+  </header>
+  <div class="body">
+    <div class="asec">
+      <span class="lbl">Animation abspielen</span>
+      <select id="emoteSel" aria-label="Animation"><option value="">– Modell laden –</option></select>
+      <div class="btnrow">
+        <button class="btn ghost" id="emotePlay">Abspielen</button>
+        <button class="btn ghost" id="emoteStop">Stopp</button>
+      </div>
+      <p class="hint">Läuft in Schleife, bis du dich bewegst. Mitspieler sehen sie auch.</p>
+    </div>
+    <div class="asec">
+      <span class="lbl">Charaktere für alle</span>
+      <p class="hint">Im Panel „Modell" kannst du Größe, Blickrichtung, Alpha und die Animationen für Stehen, Laufen und Rückwärts jetzt ändern. Als Gastgeber übernehmen deine Mitspieler das sofort.</p>
+      <button class="btn ghost" id="rosterExport">Dauerhaft speichern …</button>
+      <div id="rosterOut" hidden>
+        <p class="hint">Kopiere den Text, öffne roster.json auf GitHub, ersetze den Inhalt und klicke „Commit changes". Oder schick ihn Claude.</p>
+        <textarea id="rosterJson" rows="8" readonly spellcheck="false" aria-label="roster.json"></textarea>
+        <div class="btnrow">
+          <button class="btn ghost" id="rosterCopy">Kopieren</button>
+          <a class="btn ghost" id="rosterGh" href="https://github.com/Zodtex/ClaudeKoopTestGame/edit/main/roster.json" target="_blank" rel="noopener">Auf GitHub öffnen</a>
+        </div>
+      </div>
+    </div>
+    <button class="btn ghost danger" id="adminLogout">Admin auf diesem Gerät abmelden</button>
+  </div>
+</aside>
 
 <div class="drop" id="drop" hidden>Dateien hier ablegen</div>
 
@@ -426,8 +465,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     let dl = leanTarget - lean; lean += dl * Math.min(1, dt * 10);
     leanGroup.rotation.y = lean;
 
+    if (emote && moveState !== 'idle') stopEmote();
     if (mixer) {
-      if (moveState === 'idle') setAction(actIdle || actWalk);
+      if (moveState === 'idle' && emoteAct) setAction(emoteAct);
+      else if (moveState === 'idle') setAction(actIdle || actWalk);
       else if (moveState === 'back') {
         if (actBack) setAction(actBack);
         else if (actWalk) { setAction(actWalk); actWalk.timeScale = -0.7; }
@@ -586,7 +627,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     } else {
       ['animIdle', 'animWalk', 'animBack'].forEach(id => fillSelect($(id), [], null, -1));
     }
-    $('modelSettings').disabled = rosterMode;
+    $('modelSettings').disabled = rosterMode && !(isAdmin && rosterSource === 'repo');
+    fillEmotes();
     $('animIdle').disabled = $('animWalk').disabled = $('animBack').disabled = !clips.length;
     $('height').value = settings?.height ?? 2;
     $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
@@ -676,6 +718,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   function clearModel() {
     if (mixer) { mixer.stopAllAction(); mixer = null; }
+    emote = null; emoteAct = null;
     actIdle = actWalk = actBack = current = null; clips = [];
     if (model) {
       pivot.remove(model);
@@ -712,6 +755,22 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     });
   }
   let rosterSource = '', repoRoster = null;
+  // ---------- Admin (nur auf Geräten, die einmal den Admin-Link geöffnet haben) ----------
+  const ADMIN_HASH = 'c1555156b036165d8f852d302c66859e175dce567ab23dd6b49a517243856fe4';
+  let isAdmin = false;
+  try { isAdmin = localStorage.getItem('wf-admin') === ADMIN_HASH; } catch (_) {}
+  async function checkAdminLink() {
+    const m = location.hash.match(/^#admin=(.+)$/);
+    if (!m) return;
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(decodeURIComponent(m[1])));
+      const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+      if (hex === ADMIN_HASH) { isAdmin = true; try { localStorage.setItem('wf-admin', hex); } catch (_) {} }
+    } catch (_) {}
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  let overrides = {};
+  try { overrides = JSON.parse(localStorage.getItem('wf-roster-overrides') || '{}') || {}; } catch (_) { overrides = {}; }
   let rosterMode = false, ownSlots = null, rosterHost = '', rosterTimer = 0;
   function dbPut(i) {
     if (rosterMode) return; // vorgegebene Charaktere des Spielleiters nicht als eigene speichern
@@ -737,6 +796,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     slot.settings = { height: +$('height').value, rot: rotOffset, alpha: $('alpha').checked,
       idle: clipName($('animIdle')), walk: clipName($('animWalk')), back: clipName($('animBack')) };
     clearTimeout(saveTimer);
+    if (isAdmin && rosterSource === 'repo' && slot.mk) {
+      overrides[slot.mk] = slot.settings;
+      try { localStorage.setItem('wf-roster-overrides', JSON.stringify(overrides)); } catch (_) {}
+      saveTimer = setTimeout(() => { if (net.host && net.ready) netSend({ t: 'cfg', id: net.id, mk: slot.mk, settings: slot.settings }); }, 250);
+      return;
+    }
     if (now) dbPut(active); else saveTimer = setTimeout(() => dbPut(active), 300);
   }
 
@@ -882,7 +947,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (R.mixer) R.mixer.stopAllAction();
     if (R.model) { R.pv.remove(R.model); disposeModel(R.model); }
     R.urls.forEach(URL.revokeObjectURL);
-    Object.assign(R, { model: null, mixer: null, clips: [], acts: {}, cur: null, urls: [] });
+    Object.assign(R, { model: null, mixer: null, clips: [], acts: {}, cur: null, urls: [], emName: undefined, emAct: null });
     R.ph.visible = true;
   }
   function removeRemote(peer) {
@@ -937,7 +1002,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const hue = Number.isFinite(pr.c) ? pr.c : 0;
     if (hue !== R.hue) { R.hue = hue; R.ph.children[0].material = R.ph.children[0].material.clone(); R.ph.children[0].material.color.setHSL(hue / 360, 0.55, 0.55); }
     const num = (v, d = 0) => Number.isFinite(v) ? v : d;
-    R.t = { x: pr.p[0], y: pr.p[1], z: pr.p[2], f: num(pr.f), l: num(pr.l), s: pr.s };
+    R.t = { x: pr.p[0], y: pr.p[1], z: pr.p[2], f: num(pr.f), l: num(pr.l), s: pr.s, em: typeof pr.em === 'string' ? pr.em.slice(0, 120) : null };
     if (!R.init) { R.init = true; R.group.position.set(R.t.x, R.t.y, R.t.z); R.group.rotation.y = R.t.f; }
     const mk = typeof pr.mk === 'string' ? pr.mk.toLowerCase() : null;
     if (mk !== R.mk) { R.mk = mk; R.sig = ''; dropRemoteModel(R); if (mk) loadRemoteModel(R, pr); }
@@ -977,7 +1042,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (R.tag) R.tag.position.y = (R.model ? R.h : 2) + 0.35;
       if (R.mixer) {
         const a = R.acts;
-        let next = t.s === 'idle' ? (a.idle || a.walk) : t.s === 'back' ? (a.back || a.walk) : (a.walk || a.idle);
+        if (t.em !== R.emName) { R.emName = t.em; const c = t.em ? R.clips.find(c => c.name === t.em) : null; R.emAct = c ? R.mixer.clipAction(c) : null; }
+        let next = t.s === 'idle' ? (R.emAct || a.idle || a.walk) : t.s === 'back' ? (a.back || a.walk) : (a.walk || a.idle);
         if (next && next !== R.cur) { next.reset().fadeIn(0.2).play(); if (R.cur) R.cur.fadeOut(0.2); R.cur = next; }
         if (a.walk) a.walk.timeScale = (t.s === 'back' && !a.back) ? -0.7 : 1;
         R.mixer.update(dt);
@@ -990,6 +1056,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const me = mode === 'play'
       ? { m: 'play', n: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
+          em: emote,
           sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
           ai: model ? clipName($('animIdle')) : null, aw: model ? clipName($('animWalk')) : null, ab: model ? clipName($('animBack')) : null }
       : { m: 'select', n: myName(), c: myHue, p: null, mk: null };
@@ -1032,6 +1099,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
+    } else if (msg.t === 'cfg') {
+      if (!net.host && rosterSource === 'repo') applyCfg(msg.mk, msg.settings);
     } else if (msg.t === 'roster') {
       if (!net.host) applyRoster(msg.id, msg.list);
     } else if (msg.t === 'req' || msg.t === 'f') {
@@ -1120,7 +1189,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function lockUI(on) {
     ['slotFolder', 'slotFiles', 'slotClear', 'slotName', 'resetModel'].forEach(id => $(id).disabled = on);
     if (on && rosterSource === 'repo') $('slotFolder').disabled = false; // Exportordner darf man wählen
-    if (on) $('modelSettings').disabled = true;
+    if (on) $('modelSettings').disabled = !(isAdmin && rosterSource === 'repo' && model);
     else $('modelSettings').disabled = !model;
   }
   async function applyRoster(hostId, list) {
@@ -1159,7 +1228,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function wireConn(conn) {
     conn.on('open', () => {
       net.conns.add(conn); net.ready = true; lastSent = '';
-      if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() }); } // Neuankömmling bekommt alle bekannten Stände
+      if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() });
+        if (isAdmin && rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings }); } // Neuankömmling bekommt alle bekannten Stände
       else { netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok'); if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); } }
       if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
@@ -1250,6 +1320,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const c = list[i], stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
       const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
       if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
+      ['idle', 'walk', 'back'].forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
+      if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
       next[i] = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
       const files = await sharedGet(mk);
       if (files) next[i].files = files;
@@ -1299,7 +1371,68 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     else if (found.length) status(`Alle Charaktere gefunden: ${found.join(', ')}.`, 'ok');
   }
 
+  // ---------- Admin-Funktionen ----------
+  let emote = null, emoteAct = null;
+  function fillEmotes() {
+    const sel = $('emoteSel'); sel.innerHTML = '';
+    if (!clips.length) { sel.innerHTML = '<option value="">– keine Animationen –</option>'; return; }
+    clips.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = c.name || `Animation ${i}`; sel.append(o); });
+  }
+  function playEmote() {
+    if (!mixer || $('emoteSel').value === '') return;
+    const clip = clips[+$('emoteSel').value]; if (!clip) return;
+    emote = clip.name; emoteAct = mixer.clipAction(clip); emoteAct.setLoop(THREE.LoopRepeat);
+  }
+  function stopEmote() { emote = null; emoteAct = null; }
+  function applyCfg(mk, set) {
+    if (typeof mk !== 'string' || !set || typeof set !== 'object') return;
+    const clean = {};
+    if (Number.isFinite(set.height)) clean.height = Math.min(8, Math.max(0.5, set.height));
+    if (Number.isFinite(set.rot)) clean.rot = set.rot;
+    clean.alpha = !!set.alpha;
+    ['idle', 'walk', 'back'].forEach(k => { if (typeof set[k] === 'string' || set[k] === null) clean[k] = set[k]; });
+    const i = slots.findIndex(sl => sl && sl.mk === mk); if (i < 0) return;
+    slots[i].settings = Object.assign({}, slots[i].settings, clean);
+    if (i === active && model) liveSettings(slots[i].settings);
+  }
+  function liveSettings(set) {
+    $('height').value = set.height ?? 2; $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
+    if (Number.isFinite(set.rot)) rotOffset = set.rot;
+    $('alpha').checked = !!set.alpha;
+    if (clips.length) { selectByName($('animIdle'), set.idle); selectByName($('animWalk'), set.walk); selectByName($('animBack'), set.back); applyAnims(); }
+    applyAlpha(); fitModel();
+  }
+  function rosterJson() {
+    const characters = slots.filter(sl => sl && sl.mk).map(sl => {
+      const st = sl.settings || {}, o = { name: sl.name, path: sl.path, height: +(st.height ?? 2).toFixed(2), alpha: !!st.alpha };
+      if (Number.isFinite(st.rot) && Math.abs(st.rot + Math.PI / 2) > 1e-3) o.rotation = Math.round(st.rot * 180 / Math.PI);
+      ['idle', 'walk', 'back'].forEach(k => { if (st[k] !== undefined) o[k] = st[k]; });
+      return o;
+    });
+    return JSON.stringify({ _hinweis: 'Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.', characters }, null, 2);
+  }
+  function showAdmin() {
+    $('adminBtn').hidden = !isAdmin;
+    if (!isAdmin) $('adminPanel').hidden = true;
+  }
+  $('adminBtn').onclick = () => { $('adminPanel').hidden = !$('adminPanel').hidden; };
+  $('adminClose').onclick = () => { $('adminPanel').hidden = true; };
+  $('emotePlay').onclick = playEmote;
+  $('emoteStop').onclick = stopEmote;
+  $('rosterExport').onclick = () => { $('rosterJson').value = rosterJson(); $('rosterOut').hidden = false; };
+  $('rosterCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('rosterJson').value); $('rosterCopy').textContent = 'Kopiert'; }
+    catch (_) { $('rosterJson').select(); $('rosterCopy').textContent = 'Markiert – Strg+C'; }
+    setTimeout(() => $('rosterCopy').textContent = 'Kopieren', 1800);
+  };
+  $('adminLogout').onclick = () => {
+    isAdmin = false; try { localStorage.removeItem('wf-admin'); } catch (_) {}
+    showAdmin(); renderSlots();
+  };
+
   (async () => {
+    await checkAdminLink();
+    showAdmin();
     db = await openDB();
     slots = await dbLoad();
     repoRoster = await fetchRoster();
