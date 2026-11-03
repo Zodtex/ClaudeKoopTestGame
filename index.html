@@ -138,7 +138,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 17:25</p>
+<p class="ver">v 03.11. 17:30</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -589,7 +589,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
 
   // ---------- Import ----------
-  const status = (msg, kind = '') => ['status', 'selStatus'].forEach(id => { const s = $(id); s.textContent = msg; s.className = 'status ' + kind; });
+  const status = (msg, kind = '') => ['status', 'selStatus'].forEach(id => {
+    const s = $(id); s.textContent = msg; s.className = 'status ' + kind;
+    s.hidden = kind === 'ok' || msg.startsWith('Lade'); // Erfolgsmeldungen nicht anzeigen, nur Hinweise und Fehler
+  });
   const base = n => decodeURIComponent(String(n).split('?')[0].split(/[\\/]/).pop()).toLowerCase();
 
   const MODEL_EXT = /\.(gltf|glb|obj|mtl|bin|png|jpe?g)$/i;
