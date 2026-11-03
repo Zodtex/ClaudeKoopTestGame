@@ -650,7 +650,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       current = a;
     }
     const target = parseFloat($('height').value);
-    fitInto(pivot, model, target, rotOffset);
+    myFit = fitInto(pivot, model, target, rotOffset);
     modelHeight = target;
   }
 
@@ -660,13 +660,15 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     pv.rotation.set(0, rot, 0);
     mdl.updateMatrixWorld(true);
     const box = poseBox(pv, mdl);
-    if (box.isEmpty()) return;
+    if (box.isEmpty()) return null;
     const size = box.getSize(new THREE.Vector3());
     const s = size.y > 0 ? height / size.y : 1;
     const c = box.getCenter(new THREE.Vector3());
     mdl.scale.setScalar(s);
     mdl.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+    return { s, of: [mdl.position.x, mdl.position.y, mdl.position.z] };
   }
+  let myFit = null;
 
   function applyAlpha() {
     if (model) setAlpha(model, $('alpha').checked);
@@ -897,7 +899,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       R.acts = { idle: byName(pr.ai), walk: byName(pr.aw), back: byName(pr.ab) };
       const pose = R.acts.idle || R.acts.walk; if (pose) { pose.reset(); pose.setEffectiveWeight(1); pose.play(); R.cur = pose; R.mixer.update(0); }
     }
-    fitInto(R.pv, R.model, R.h, typeof pr.r === 'number' ? pr.r : -Math.PI / 2);
+    const rot = typeof pr.r === 'number' ? pr.r : -Math.PI / 2;
+    if (Number.isFinite(pr.sc) && pr.sc > 0 && pr.sc < 1e4 && Array.isArray(pr.of) && pr.of.length === 3 && pr.of.every(Number.isFinite)) {
+      // Exakt dieselbe Skalierung wie beim Besitzer der Figur
+      R.pv.rotation.set(0, rot, 0); R.model.scale.setScalar(pr.sc); R.model.position.set(pr.of[0], pr.of[1], pr.of[2]);
+    } else fitInto(R.pv, R.model, R.h, rot);
   }
   async function loadRemoteModel(R, pr) {
     const key = R.mk;
@@ -935,7 +941,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!R.init) { R.init = true; R.group.position.set(R.t.x, R.t.y, R.t.z); R.group.rotation.y = R.t.f; }
     const mk = typeof pr.mk === 'string' ? pr.mk.toLowerCase() : null;
     if (mk !== R.mk) { R.mk = mk; R.sig = ''; dropRemoteModel(R); if (mk) loadRemoteModel(R, pr); }
-    const sig = JSON.stringify([pr.h, pr.r, pr.a, pr.ai, pr.aw, pr.ab]);
+    const sig = JSON.stringify([pr.h, pr.r, pr.a, pr.ai, pr.aw, pr.ab, pr.sc, pr.of]);
     if (sig !== R.sig) { R.sig = sig; applyRemoteLook(R, pr); }
   }
 
@@ -984,6 +990,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const me = mode === 'play'
       ? { m: 'play', n: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
+          sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
           ai: model ? clipName($('animIdle')) : null, aw: model ? clipName($('animWalk')) : null, ab: model ? clipName($('animBack')) : null }
       : { m: 'select', n: myName(), c: myHue, p: null, mk: null };
     const json = JSON.stringify(me);
