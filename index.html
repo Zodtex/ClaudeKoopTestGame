@@ -93,6 +93,7 @@ a.btn { text-decoration: none; display: inline-block; }
 .nb-show { display: flex; flex-direction: column; align-items: center; background: var(--panel); border: 1px solid rgba(208,166,78,0.45); border-radius: 6px; padding: 6px 18px; min-width: 160px; }
 .nb-show b { font: 600 17px var(--f-display); letter-spacing: 0.08em; color: var(--gold); }
 .nb-show span { font-size: 11.5px; color: var(--muted); }
+input[type=color] { width: 100%; height: 30px; padding: 2px; background: #1b2229; border: 1px solid var(--line); border-radius: 4px; }
 .rrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
 .rrow .n { font-family: var(--f-display); color: var(--gold); }
 .rrow .ins { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -138,7 +139,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 19:00</p>
+<p class="ver">v 03.11. 19:30</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -242,6 +243,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         <select id="animJump"><option value="">– keine –</option></select>
         <button class="iconbtn pv" data-for="animJump" title="Vorschau abspielen" aria-label="Springen ansehen">▶</button>
       </div>
+      <div class="field anim">
+        <label for="animSwim">Schwimmen</label>
+        <select id="animSwim"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animSwim" title="Vorschau abspielen" aria-label="Schwimmen ansehen">▶</button>
+      </div>
+      <div class="field anim">
+        <label for="animSwimIdle">Im Wasser</label>
+        <select id="animSwimIdle"><option value="">– keine –</option></select>
+        <button class="iconbtn pv" data-for="animSwimIdle" title="Vorschau abspielen" aria-label="Im Wasser ansehen">▶</button>
+      </div>
       <button class="btn ghost danger" id="resetModel">Modell entfernen</button>
     </fieldset>
   </div>
@@ -283,6 +294,48 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <input type="file" id="mapInput" webkitdirectory multiple hidden>
       <div class="netstate" id="mapState">Keine Karte. Es gilt das Übungsfeld.</div>
       <p class="hint">In wow.export unter „Maps" Kacheln markieren und als OBJ exportieren. Wähle dann deinen <b>obersten</b> Exportordner (der „maps" und „world" enthält), damit auch Bäume und Gebäude gefunden werden. Speichern für alle mit „Dauerhaft speichern".</p>
+    </div>
+    <div class="asec">
+      <span class="lbl">Wasser</span>
+      <label class="check"><input type="checkbox" id="waterOn"> Wasser anzeigen</label>
+      <div class="field">
+        <label for="waterLevel">Höhe</label>
+        <div><input type="range" id="waterLevel" min="-20" max="200" step="0.1" value="0"><span class="val" id="waterVal">0.0</span></div>
+      </div>
+      <button class="btn ghost" id="waterHere">Auf meine Höhe setzen</button>
+      <p class="hint">Stell dich ans Ufer und klick „Auf meine Höhe setzen". Wo das Wasser tiefer ist als die Figur, wird geschwommen.</p>
+    </div>
+    <div class="asec">
+      <span class="lbl">Himmel &amp; Licht</span>
+      <div class="field">
+        <label for="envPreset">Vorlage</label>
+        <select id="envPreset">
+          <option value="">– wählen –</option>
+          <option value="standard">Standard</option>
+          <option value="dschungel">Dschungel</option>
+          <option value="wald">Wald</option>
+          <option value="wueste">Wüste</option>
+          <option value="schnee">Schnee</option>
+          <option value="abend">Abend</option>
+          <option value="nacht">Nacht</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="envSky">Himmel</label>
+        <input type="color" id="envSky" value="#9db4c4">
+      </div>
+      <div class="field">
+        <label for="envFog">Sichtweite</label>
+        <div><input type="range" id="envFog" min="150" max="3000" step="10" value="1400"><span class="val" id="envFogVal">1400</span></div>
+      </div>
+      <div class="field">
+        <label for="envLight">Helligkeit</label>
+        <div><input type="range" id="envLight" min="0.2" max="2" step="0.05" value="1"><span class="val" id="envLightVal">1.00</span></div>
+      </div>
+      <div class="field">
+        <label for="envSun">Sonnenstand</label>
+        <div><input type="range" id="envSun" min="5" max="85" step="1" value="50"><span class="val" id="envSunVal">50°</span></div>
+      </div>
     </div>
     <div class="asec">
       <span class="lbl">Animation abspielen</span>
@@ -347,7 +400,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
 
-  scene.add(new THREE.HemisphereLight(0xdfe9f2, 0x4a5a3a, 0.75));
+  const hemi = new THREE.HemisphereLight(0xdfe9f2, 0x4a5a3a, 0.75); scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff1d6, 1.1);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -430,13 +483,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     { k: 'sl', id: 'animSL', re: /shuffleleft|strafeleft/i, fb: -1, net: 'asl' },
     { k: 'sr', id: 'animSR', re: /shuffleright|straferight/i, fb: -1, net: 'asr' },
     { k: 'jump', id: 'animJump', re: /^jump\b/i, fb: -1, net: 'aj' },
+    { k: 'swim', id: 'animSwim', re: /^swim\s/i, fb: -1, net: 'asw' },
+    { k: 'swimidle', id: 'animSwimIdle', re: /^swimidle/i, fb: -1, net: 'asi' },
   ];
   const ANIM_KEYS = ANIMS.map(a => a.k);
   let blobURLs = [];
 
   // ---------- Steuerung (WoW-Stil) ----------
   // Werte in Yards wie im Original: Laufen 7 y/s, Rückwärts 4,5 y/s, Drehen 180°/s, Sprung ~1,6 y hoch
-  const MOVE = { run: 7, back: 4.5, turn: Math.PI, jumpV: 7.96, g: 19.29, mouse: 0.005 };
+  let swimming = false, sunEl = 50;
+  const MOVE = { swim: 4.72, run: 7, back: 4.5, turn: Math.PI, jumpV: 7.96, g: 19.29, mouse: 0.005 };
   const keys = new Set();
   let autorun = false;
   let mode = 'select', previewAng = 0;
@@ -536,28 +592,35 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const fx = Math.sin(facing), fz = Math.cos(facing);   // vorwärts
       const lx = Math.cos(facing), lz = -Math.sin(facing);  // links
       vel.set(fx * fwd + lx * str, 0, fz * fwd + lz * str);
-      if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(fwd < 0 ? MOVE.back : MOVE.run);
-      if (k('Space')) { velY = MOVE.jumpV; onGround = false; } // Im Sprung bleibt die Richtung fest
+      if (vel.lengthSq() > 0) vel.normalize().multiplyScalar(swimming ? MOVE.swim : fwd < 0 ? MOVE.back : MOVE.run);
+      if (k('Space') && !swimming) { velY = MOVE.jumpV; onGround = false; } // Im Sprung bleibt die Richtung fest
       leanTarget = fwd > 0 ? str * Math.PI / 4 : fwd < 0 ? -str * Math.PI / 4 : str * Math.PI / 2;
       moveState = !moving ? 'idle' : fwd < 0 ? 'back' : fwd === 0 ? (str > 0 ? 'sl' : 'sr') : 'run';
       if ((moveState === 'sl' && acts.sl) || (moveState === 'sr' && acts.sr)) leanTarget = 0; // eigene Seitwärts-Animation: nicht drehen
+      if (swimming) { moveState = moving ? 'swim' : 'swimidle'; if (fwd === 0) leanTarget = str * Math.PI / 2; }
     }
     const ox = player.position.x, oz = player.position.z;
     player.position.addScaledVector(vel, dt);
     if (mapIndex) {
       // Nicht über den Kartenrand oder in Löcher laufen
       if (groundAt(player.position.x, player.position.z) === null) { player.position.x = ox; player.position.z = oz; }
+      else collideObstacles();
     } else {
       player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF, HALF);
       player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF, HALF);
     }
     const gnd = mapIndex ? (groundAt(player.position.x, player.position.z) ?? player.position.y) : 0;
+    // Wasser: tiefer als die Figur → an der Oberfläche schwimmen
+    const wl = waterLevel(), swimY = wl === null ? -Infinity : wl - modelHeight * 0.65;
+    const floor = swimY > gnd ? swimY : gnd;
     velY -= MOVE.g * dt;
     player.position.y += velY * dt;
-    if (player.position.y <= gnd) { player.position.y = gnd; velY = 0; onGround = true; }
-    else if (onGround && velY <= 0 && player.position.y - gnd < 1.2) { player.position.y = gnd; velY = 0; } // Hang hinunter
+    if (player.position.y <= floor) { player.position.y = floor; velY = 0; onGround = true; }
+    else if (onGround && velY <= 0 && player.position.y - floor < 1.2) { player.position.y = floor; velY = 0; } // Hang hinunter
     else onGround = false;
+    swimming = swimY > gnd && Math.abs(player.position.y - swimY) < 0.05;
     if (!onGround) moveState = 'jump';
+    else if (swimming && moveState !== 'swim') moveState = 'swimidle';
     player.rotation.y = facing;
 
     let dl = leanTarget - lean; lean += dl * Math.min(1, dt * 10);
@@ -592,11 +655,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (mapIndex) { const ch = groundAt(camera.position.x, camera.position.z); if (ch !== null && camera.position.y < ch + 0.6) camera.position.y = ch + 0.6; }
     camera.lookAt(tx, ty, tz);
 
-    sun.position.set(player.position.x + 20, player.position.y + 40, player.position.z + 12);
+    const el = sunEl * Math.PI / 180;
+    sun.position.set(player.position.x + Math.cos(el) * 40, player.position.y + Math.sin(el) * 45, player.position.z + Math.cos(el) * 24);
     sun.target.position.copy(player.position);
 
     $('coords').textContent = `${mapLoaded && mapCfg ? mapCfg.name + ' · ' : ''}x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
 
+    updateEnvFrame(dt);
     coopUpdate(dt);
     resize();
     renderer.render(scene, camera);
@@ -845,6 +910,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       case 'sl': return A.sl || A.walk || A.idle;
       case 'sr': return A.sr || A.walk || A.idle;
       case 'jump': return A.jump || cur || A.idle;
+      case 'swim': return A.swim || A.walk || A.idle;
+      case 'swimidle': return A.swimidle || A.swim || A.idle;
       default: return A.walk || A.idle;
     }
   }
@@ -1456,7 +1523,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const r = await fetch('roster.json', { cache: 'no-cache' });
       if (!r.ok) return null;
       const j = await r.json();
-      repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40), spawn: j.map.spawn } : null;
+      repoMap = j.map && typeof j.map.key === 'string' && j.map.key.startsWith('map:') ? { key: j.map.key.slice(0, 200), name: String(j.map.name || 'Karte').slice(0, 40), spawn: j.map.spawn, water: j.map.water, env: j.map.env } : null;
       const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
       return list;
     } catch (_) { return null; }
@@ -1691,6 +1758,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           o.position.set(MAX - px, py, MAX - pz);
           o.rotation.set((+r.RotationZ || 0) * D, ((+r.RotationY || 0) + 90) * D, -(+r.RotationX || 0) * D, 'YZX');
           const sc = +r.ScaleFactor; o.scale.setScalar(Number.isFinite(sc) && sc > 0 ? sc : 1);
+          o.userData.tpl = name;
           deco.add(o); placed++;
         }
       }
@@ -1702,8 +1770,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       group.updateMatrixWorld(true);
       mapIndex = buildIndex(terrain);
       mapPlaced = placed;
+      buildObstacles(deco, templates);
+      mapTop = box.max.y - box.min.y;
       propsGroup.visible = false; ground.visible = false;
-      scene.fog.near = 180; scene.fog.far = 1400;
+      mapLoaded = true; applyEnv(); updateWater(); mapLoaded = false;
       // Startpunkt: Mitte der Karte, sonst spiralförmig die nächste begehbare Stelle
       let found = null;
       for (let r = 0; r < 600 && !found; r += 8) for (let a = 0; a < Math.PI * 2 && !found; a += r ? 8 / r : 7) {
@@ -1711,7 +1781,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       }
       spawn.set(...(found || [0, 0, 0])); spawnFacing = 0;
       applySpawn();
-      mapLoaded = true;
+      mapLoaded = true; renderEnvAdmin();
       if (mode !== 'play' || !found || groundAt(player.position.x, player.position.z) === null) resetPlayer();
       mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}${placed ? ` · ${placed} Objekte` : ''}.`, 'ok');
     } catch (e) {
@@ -1721,10 +1791,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function unloadMap(restore = true) {
     if (mapGroup) { scene.remove(mapGroup); disposeModel(mapGroup); }
     mapUrls.forEach(URL.revokeObjectURL);
-    mapGroup = null; mapIndex = null; mapUrls = []; mapLoaded = false;
+    mapGroup = null; mapIndex = null; mapUrls = []; mapLoaded = false; obstacles = null;
+    if (water) water.visible = false;
     if (restore) {
       propsGroup.visible = true; ground.visible = true;
-      scene.fog.near = 40; scene.fog.far = 140;
+      applyEnv();
       spawn.set(0, 0, 0); resetPlayer();
     }
   }
@@ -1732,9 +1803,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const key = cfg && typeof cfg.key === 'string' && cfg.key.startsWith('map:') ? cfg.key.slice(0, 200) : null;
     if (!key) { if (mapCfg) { mapCfg = null; unloadMap(); } mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); return; }
     const same = mapCfg && mapCfg.key === key;
-    mapCfg = { key, name: String(cfg.name || 'Karte').slice(0, 40), spawn: cleanSpawn(cfg.spawn) };
+    mapCfg = { key, name: String(cfg.name || 'Karte').slice(0, 40), spawn: cleanSpawn(cfg.spawn), water: cleanWater(cfg.water), env: cleanEnv(cfg.env) };
     renderMapAdmin();
-    if (same && mapLoaded) { applySpawn(); return; }
+    if (same && mapLoaded) { applySpawn(); applyEnv(); updateWater(); return; }
     if (same && mapLoading) return;
     if (!same && mapLoaded) unloadMap();
     const files = await sharedGet(key);
@@ -1744,6 +1815,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function renderMapAdmin() {
     if (document.activeElement !== $('mapName')) $('mapName').value = mapCfg ? mapCfg.name : '';
+    renderEnvAdmin();
   }
   function broadcastMap() { if (net.host && net.ready) netSend({ t: 'map', id: net.id, map: mapCfg }); }
 
@@ -1773,6 +1845,146 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     broadcastMap();
   };
   $('mapClear').onclick = () => { mapCfg = null; unloadMap(); mapMsg('Keine Karte. Es gilt das Übungsfeld.'); renderMapAdmin(); broadcastMap(); };
+
+  // ---------- Wasser ----------
+  let water = null, waterTex = null, mapTop = 100;
+  const cleanWater = w => w && typeof w === 'object' && Number.isFinite(+w.level) ? { on: !!w.on, level: Math.max(-1000, Math.min(5000, +w.level)) } : null;
+  const waterLevel = () => mapLoaded && mapCfg && mapCfg.water && mapCfg.water.on ? mapCfg.water.level : null;
+  function waterTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#2b6f8c'; g.fillRect(0, 0, 128, 128);
+    let s = 3; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(${170 + rnd() * 60},${215 + rnd() * 40},255,${0.05 + rnd() * 0.12})`; g.fillRect(rnd() * 128, rnd() * 128, 3 + rnd() * 10, 1 + rnd() * 2); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding;
+    return t;
+  }
+  function updateWater() {
+    const wl = waterLevel();
+    if (wl === null || !mapIndex) { if (water) water.visible = false; return; }
+    if (!water) {
+      waterTex = waterTexture();
+      water = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshPhongMaterial({ map: waterTex, color: 0xffffff, transparent: true, opacity: 0.78, shininess: 80, specular: 0x6688aa, depthWrite: false, side: THREE.DoubleSide }));
+      water.rotation.x = -Math.PI / 2; water.renderOrder = 2; scene.add(water);
+    }
+    const I = mapIndex, w = I.maxX - I.minX + 600, d = I.maxZ - I.minZ + 600;
+    water.scale.set(w, d, 1); water.position.set((I.minX + I.maxX) / 2, wl, (I.minZ + I.maxZ) / 2);
+    waterTex.repeat.set(w / 24, d / 24);
+    water.visible = true;
+  }
+
+  // ---------- Himmel & Licht ----------
+  const ENV_DEFAULT = { sky: '#9db4c4', fog: 1400, light: 1, sun: 50 };
+  const ENV_PRESETS = {
+    standard: ENV_DEFAULT,
+    dschungel: { sky: '#8fb8a0', fog: 650, light: 0.95, sun: 62 },
+    wald: { sky: '#a8c5da', fog: 1000, light: 1, sun: 45 },
+    wueste: { sky: '#e2c89c', fog: 1700, light: 1.25, sun: 72 },
+    schnee: { sky: '#dde7ef', fog: 520, light: 1.1, sun: 32 },
+    abend: { sky: '#e39a6c', fog: 1100, light: 0.8, sun: 10 },
+    nacht: { sky: '#1a2540', fog: 600, light: 0.35, sun: 30 },
+  };
+  const cleanEnv = e => {
+    if (!e || typeof e !== 'object') return null;
+    const n = (v, lo, hi, d) => Number.isFinite(+v) ? Math.max(lo, Math.min(hi, +v)) : d;
+    return { sky: /^#[0-9a-f]{6}$/i.test(e.sky) ? e.sky.toLowerCase() : ENV_DEFAULT.sky, fog: n(e.fog, 150, 3000, 1400), light: n(e.light, 0.2, 2, 1), sun: n(e.sun, 5, 85, 50) };
+  };
+  const skyCol = new THREE.Color(), deepCol = new THREE.Color(0x1d4f66), warm = new THREE.Color(0xffb070), white = new THREE.Color(0xfff1d6);
+  let fogNear = 40, fogFar = 140;
+  function applyEnv() {
+    const e = (mapLoaded && mapCfg && mapCfg.env) || ENV_DEFAULT;
+    skyCol.set(e.sky);
+    if (mapLoaded) { fogFar = e.fog; fogNear = e.fog * 0.13; } else { fogNear = 40; fogFar = 140; }
+    hemi.intensity = 0.75 * e.light; sun.intensity = 1.1 * e.light;
+    sunEl = e.sun;
+    sun.color.copy(white).lerp(warm, Math.max(0, 1 - e.sun / 35));
+    hemi.color.set(0xdfe9f2).lerp(skyCol, 0.35);
+  }
+  function updateEnvFrame(dt) {
+    const wl = waterLevel(), under = wl !== null && camera.position.y < wl;
+    scene.background.copy(under ? deepCol : skyCol);
+    scene.fog.color.copy(under ? deepCol : skyCol);
+    scene.fog.near = under ? 0 : fogNear; scene.fog.far = under ? 45 : fogFar;
+    if (waterTex && water && water.visible) { waterTex.offset.x += dt * 0.012; waterTex.offset.y += dt * 0.006; }
+  }
+  function renderEnvAdmin() {
+    const has = !!(mapCfg && mapLoaded);
+    ['waterOn', 'waterLevel', 'waterHere', 'envPreset', 'envSky', 'envFog', 'envLight', 'envSun'].forEach(id => $(id).disabled = !has);
+    const w = (mapCfg && mapCfg.water) || { on: false, level: 0 }, e = (mapCfg && mapCfg.env) || ENV_DEFAULT;
+    $('waterLevel').min = Math.floor(-20); $('waterLevel').max = Math.ceil(mapTop + 20);
+    $('waterOn').checked = w.on; $('waterLevel').value = w.level; $('waterVal').textContent = (+w.level).toFixed(1);
+    $('envSky').value = e.sky; $('envFog').value = e.fog; $('envFogVal').textContent = Math.round(e.fog);
+    $('envLight').value = e.light; $('envLightVal').textContent = (+e.light).toFixed(2);
+    $('envSun').value = e.sun; $('envSunVal').textContent = Math.round(e.sun) + '°';
+  }
+  let envTimer = 0;
+  function envChanged() {
+    applyEnv(); updateWater(); renderEnvAdmin();
+    clearTimeout(envTimer); envTimer = setTimeout(broadcastMap, 300);
+  }
+  const setWater = patch => { if (!mapCfg) return; mapCfg.water = Object.assign({ on: false, level: 0 }, mapCfg.water, patch); envChanged(); };
+  const setEnv = patch => { if (!mapCfg) return; mapCfg.env = cleanEnv(Object.assign({}, ENV_DEFAULT, mapCfg.env, patch)); envChanged(); };
+  applyEnv();
+  $('waterOn').onchange = e => setWater({ on: e.target.checked });
+  $('waterLevel').oninput = e => setWater({ level: +e.target.value, on: true });
+  $('waterHere').onclick = () => setWater({ level: Math.round(player.position.y * 10) / 10, on: true });
+  $('envPreset').onchange = e => { const p = ENV_PRESETS[e.target.value]; e.target.value = ''; if (p) setEnv(p); };
+  $('envSky').oninput = e => setEnv({ sky: e.target.value });
+  $('envFog').oninput = e => setEnv({ fog: +e.target.value });
+  $('envLight').oninput = e => setEnv({ light: +e.target.value });
+  $('envSun').oninput = e => setEnv({ sun: +e.target.value });
+
+  // ---------- Kollision mit Bäumen und Objekten ----------
+  // Pro Modell wird die Grundfläche am Boden gemessen (Stamm statt Krone), daraus ein runder Fuß.
+  let obstacles = null;
+  function footprint(tpl) {
+    const v = new THREE.Vector3(); const pts = [];
+    let minY = Infinity, maxY = -Infinity;
+    tpl.updateMatrixWorld(true);
+    tpl.traverse(o => {
+      if (!o.isMesh) return;
+      const pos = o.geometry.attributes.position, step = Math.max(1, Math.floor(pos.count / 6000));
+      for (let i = 0; i < pos.count; i += step) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrix); pts.push(v.x, v.y, v.z); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
+    });
+    if (!pts.length) return null;
+    const h = maxY - minY, band = minY + Math.max(0.3, h * 0.12);
+    let cx = 0, cz = 0, n = 0;
+    for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] <= band) { cx += pts[i]; cz += pts[i + 2]; n++; }
+    if (!n) return null;
+    cx /= n; cz /= n;
+    let r = 0;
+    for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] <= band) r = Math.max(r, Math.hypot(pts[i] - cx, pts[i + 2] - cz));
+    return { cx, cz, minY, h, r: Math.min(r, 2.5) };
+  }
+  function buildObstacles(deco, templates) {
+    const fps = new Map();
+    for (const [name, tpl] of templates) if (tpl) fps.set(name, footprint(tpl));
+    const CELL = 8, cells = new Map(), list = [], v = new THREE.Vector3();
+    deco.updateMatrixWorld(true);
+    for (const o of deco.children) {
+      const fp = fps.get(o.userData.tpl); if (!fp) continue;
+      const sc = o.scale.x, h = fp.h * sc, r = fp.r * sc;
+      if (h < 0.6 || r < 0.12) continue; // Flaschen, Gras & Co. nicht
+      v.set(fp.cx, fp.minY, fp.cz); o.localToWorld(v);
+      const i = list.length; list.push({ x: v.x, z: v.z, y: v.y, top: v.y + h, r });
+      const x0 = Math.floor((v.x - r) / CELL), x1 = Math.floor((v.x + r) / CELL), z0 = Math.floor((v.z - r) / CELL), z1 = Math.floor((v.z + r) / CELL);
+      for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 100003 + z; let a = cells.get(k); if (!a) cells.set(k, a = []); a.push(i); }
+    }
+    obstacles = { CELL, cells, list };
+  }
+  function collideObstacles() {
+    if (!obstacles) return;
+    const P = player.position, R = 0.4 * Math.max(0.6, modelHeight / 2);
+    const a = obstacles.cells.get(Math.floor(P.x / obstacles.CELL) * 100003 + Math.floor(P.z / obstacles.CELL)); if (!a) return;
+    for (const i of a) {
+      const o = obstacles.list[i];
+      if (P.y > o.top - 0.2 || P.y + modelHeight < o.y) continue;
+      const dx = P.x - o.x, dz = P.z - o.z, d = Math.hypot(dx, dz), min = o.r + R;
+      if (d >= min) continue;
+      if (d < 1e-4) { P.x += min; continue; }
+      P.x = o.x + dx / d * min; P.z = o.z + dz / d * min;
+    }
+  }
 
   // ---------- Admin-Funktionen ----------
   let emote = null, emoteAct = null;
@@ -1874,7 +2086,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       return o;
     });
     const out = { _hinweis: 'Nur Pfade und Einstellungen. Modelle und Karte kommen aus der eigenen WoW-Installation bzw. vom Admin.', characters };
-    if (mapCfg) { out.map = { name: mapCfg.name, key: mapCfg.key }; if (mapCfg.spawn) out.map.spawn = mapCfg.spawn; }
+    if (mapCfg) {
+      out.map = { name: mapCfg.name, key: mapCfg.key };
+      if (mapCfg.spawn) out.map.spawn = mapCfg.spawn;
+      if (mapCfg.water) out.map.water = mapCfg.water;
+      if (mapCfg.env) out.map.env = mapCfg.env;
+    }
     return JSON.stringify(out, null, 2);
   }
   function showAdmin() {
