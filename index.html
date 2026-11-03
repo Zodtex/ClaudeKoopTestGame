@@ -29,6 +29,16 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .brand { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 .brand h1 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 22px; letter-spacing: 0.08em; color: var(--parch); text-shadow: 0 2px 8px rgba(0,0,0,.6); }
 .ver { position: fixed; z-index: 2; left: max(8px, env(safe-area-inset-left, 0px)); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 10px var(--f-mono); color: var(--parch); opacity: 0.55; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
+/* Ladebalken: blockiert alles, bis die Daten da sind */
+.loadov { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(8,11,15,0.62); backdrop-filter: blur(2px); padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); cursor: wait; }
+.loadbox { width: min(420px, 100%); background: var(--panel); border: 1px solid rgba(208,166,78,0.6); border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 16px 50px rgba(0,0,0,0.5); }
+.loadbox .lt { font: 600 15px var(--f-display); letter-spacing: 0.08em; color: var(--gold); text-align: center; }
+.loadbox .bar { height: 14px; border-radius: 7px; background: #0d1216; border: 1px solid rgba(208,166,78,0.45); overflow: hidden; }
+.loadbox .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #8a6a2c, #e0b45a); transition: width 0.25s; }
+.loadbox .bar.indet i { width: 35% !important; animation: indet 1.2s ease-in-out infinite; }
+@keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
+@media (prefers-reduced-motion: reduce) { .loadbox .bar.indet i { animation: none; width: 100% !important; opacity: 0.5; } }
+.loadbox .lp { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Chat unten links */
 .chat { left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 .chatlog { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow: hidden; justify-content: flex-end; font-size: 13.5px; line-height: 1.35; }
@@ -174,7 +184,14 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <div class="mmzone" id="mmZone">Übungsfeld</div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
-<p class="ver">v 03.11. 21:00</p>
+<div class="loadov" id="loadOv" hidden role="alertdialog" aria-live="polite" aria-labelledby="loadTitle">
+  <div class="loadbox">
+    <div class="lt" id="loadTitle">Lade …</div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
+  </div>
+</div>
+<p class="ver">v 03.11. 21:20</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -537,6 +554,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   let mode = 'select', previewAng = 0;
   const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type === 'text')); };
   addEventListener('keydown', e => {
+    if (loadTasks.size) { e.preventDefault(); return; }
     if (typing() || mode !== 'play') return;
     if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === '/') { e.preventDefault(); openChat(e.key === '/' ? '/' : ''); return; }
     if (e.code === 'NumLock' || e.code === 'KeyR') { if (!e.repeat) autorun = !autorun; }
@@ -1263,7 +1281,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     row(myHue, shownName(), mode === 'play' ? `du · ${myName()}` : 'du');
     others.forEach(p => {
       const pr = p.presence || {};
-      row(Number.isFinite(pr.c) ? pr.c : 0, String(pr.n || 'Abenteurer').slice(0, 24), pr.m === 'play' ? String(pr.cn || '').slice(0, 24) : 'Auswahl');
+      row(Number.isFinite(pr.c) ? pr.c : 0, String(pr.n || 'Abenteurer').slice(0, 24), Number.isFinite(pr.ld) ? `lädt ${Math.round(pr.ld)} %` : pr.m === 'play' ? String(pr.cn || '').slice(0, 24) : 'Auswahl');
     });
   }
 
@@ -1298,10 +1316,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const me = mode === 'play'
       ? { m: 'play', n: shownName(), cn: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
-          em: emote,
+          em: emote, ld: loadPercent(),
           sc: model && myFit ? +myFit.s.toPrecision(6) : null, of: model && myFit ? myFit.of.map(v => +v.toPrecision(6)) : null,
           ...Object.fromEntries(ANIMS.map(a => [a.net, model ? clipName($(a.id)) : null])) }
-      : { m: 'select', n: shownName(), cn: myName(), c: myHue, p: null, mk: null };
+      : { m: 'select', n: shownName(), cn: myName(), c: myHue, p: null, mk: null, ld: loadPercent() };
     const json = JSON.stringify(me);
     if (!force && json === lastSent && keepAlive < 2) return;
     lastSent = json; keepAlive = 0;
@@ -1351,9 +1369,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (net.host && conn) { if (!connIds.has(conn)) connIds.set(conn, new Set()); connIds.get(conn).add(msg.id); netSend(msg, conn); }
       syncPeer({ peer: msg.id, sameTab: false, kind: 'viewer', guest: false, presence: msg.st });
       // Fehlende vorgegebene Charaktere bei Mitspielern anfragen (wer sie hat, schickt sie)
-      if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) requestModel(msg.id, sl.mk);
-      if (mapCfg && !mapLoaded && !mapLoading) requestModel(msg.id, mapCfg.key);
-      if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
+      if (rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && !(sl.files && sl.files.length)) { waitFor(sl.mk); requestModel(msg.id, sl.mk); }
+      if (mapCfg && !mapLoaded && !mapLoading) { waitFor(mapCfg.key); requestModel(msg.id, mapCfg.key); }
+      if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c || prev.ld !== msg.st.ld || prev.cn !== msg.st.cn) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
     } else if (msg.t === 'chat') {
@@ -1409,11 +1427,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!sl) return;
     const files = sl.files.filter(f => MODEL_EXT.test(f.name));
     netMsg(`Sende ${sl.name || key} an einen Mitspieler …`, 'ok');
+    const tot = files.reduce((a, f) => a + f.size, 0);
     let total = 0;
     for (let i = 0; i < files.length; i++) {
       const buf = await files[i].arrayBuffer();
       total += buf.byteLength; if (total > limitFor(key)) return;
-      netSendTo(toId, { t: 'f', id: net.id, to: toId, mk: key, i, n: files.length, name: files[i].name, buf });
+      netSendTo(toId, { t: 'f', id: net.id, to: toId, mk: key, i, n: files.length, tot, name: files[i].name, buf });
     }
   }
   function receiveFile(m) {
@@ -1423,11 +1442,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     let inc = incoming.get(m.mk);
     if (!inc || inc.n !== m.n) { inc = { n: m.n, files: new Array(m.n), got: 0, size: 0 }; incoming.set(m.mk, inc); }
     if (inc.files[m.i]) return;
-    status(`Empfange ${m.mk} … ${inc.got + 1}/${inc.n} Dateien`);
-    inc.size += m.buf.byteLength; if (inc.size > limitFor(m.mk)) { incoming.delete(m.mk); return; }
+    inc.size += m.buf.byteLength; if (inc.size > limitFor(m.mk)) { incoming.delete(m.mk); endTask(m.mk); return; }
+    const tot = Number.isFinite(m.tot) && m.tot > 0 ? m.tot : 0;
+    setTask(m.mk, `${labelFor(m.mk)} wird übertragen`, tot ? inc.size : inc.got + 1, tot || inc.n, tot ? `${(inc.size / 1048576).toFixed(1)} / ${(tot / 1048576).toFixed(1)} MB` : `${inc.got + 1} / ${inc.n} Dateien`);
+    clearTimeout(inc.stall); inc.stall = setTimeout(() => { if (incoming.get(m.mk) === inc) { incoming.delete(m.mk); endTask(m.mk); } }, 30000);
     inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
     if (inc.got < inc.n) return;
-    incoming.delete(m.mk);
+    incoming.delete(m.mk); clearTimeout(inc.stall); endTask(m.mk);
     sharedPut(m.mk, inc.files);
     status(`${m.mk} empfangen und gespeichert.`, 'ok');
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
@@ -1766,6 +1787,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       manager.setURLModifier(url => (url.startsWith('data:') || own.has(url)) ? url : (map[base(url)] || url));
       const group = new THREE.Group(), terrain = new THREE.Group(), deco = new THREE.Group();
       group.add(terrain, deco);
+      // Schritte für den Ladebalken: Kacheln + verschiedene Objektmodelle
+      const uniq = new Set();
+      for (const t of tiles) { const csv = csvFor(files, base(t.name).replace(/\.obj$/, '')); if (csv) for (const r of parseCsv(await csv.text())) { const nm = base(String(r.ModelFile || '').replace(/\\/g, '/')); if (nm && map[nm]) uniq.add(nm); } }
+      const steps = tiles.length + uniq.size; let step = 0;
+      const stepDone = what => setTask('mapbuild', `${mapCfg ? mapCfg.name : 'Karte'} wird aufgebaut`, ++step, steps, what);
+      setTask('mapbuild', `${mapCfg ? mapCfg.name : 'Karte'} wird aufgebaut`, 0, steps, '');
       for (const t of tiles) {
         const stem = base(t.name).replace(/\.obj$/, '');
         const loader = new THREE.OBJLoader(manager);
@@ -1777,6 +1804,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) m.map.encoding = THREE.sRGBEncoding; m.side = THREE.DoubleSide; if (m.specular) m.specular.setScalar(0); m.needsUpdate = true; });
         });
         terrain.add(obj);
+        stepDone(`Gelände ${t.name}`);
       }
       // Bäume, Pflanzen und Gebäude aus den ModelPlacementInformation-Listen (wow.export)
       const MAX = 51200 / 3, D = Math.PI / 180, templates = new Map();
@@ -1799,6 +1827,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
               });
             } catch (e) { console.warn('Objekt nicht geladen:', name, e); }
             templates.set(name, tpl);
+            stepDone(name.replace(/\.obj$/, ''));
           }
           const tpl = templates.get(name); if (!tpl) continue;
           const px = +r.PositionX, py = +r.PositionY, pz = +r.PositionZ;
@@ -1836,7 +1865,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}${placed ? ` · ${placed} Objekte` : ''}.`, 'ok');
     } catch (e) {
       console.error(e); mapMsg(`Karte konnte nicht geladen werden: ${e.message || e}`, 'err');
-    } finally { mapLoading = false; }
+    } finally { mapLoading = false; endTask('mapbuild'); }
   }
   function unloadMap(restore = true) {
     if (mapGroup) { scene.remove(mapGroup); disposeModel(mapGroup); }
@@ -2125,6 +2154,52 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (d < 1e-4) { P.x += min; continue; }
       P.x = o.x + dx / d * min; P.z = o.z + dz / d * min;
     }
+  }
+
+  // ---------- Ladebalken ----------
+  const loadTasks = new Map(), waitTimers = new Map();
+  function labelFor(key) {
+    if (mapCfg && key === mapCfg.key) return `Karte „${mapCfg.name}"`;
+    const sl = slots.find(x => x && x.mk === key) || (ownSlots || []).find(x => x && x.mk === key);
+    if (sl && sl.name) return `Charakter „${sl.name}"`;
+    return 'Modell eines Mitspielers';
+  }
+  function setTask(id, label, done, total, detail) {
+    if (!loadTasks.size && mode === 'play') haltMovement();
+    if (waitTimers.has(id)) { clearTimeout(waitTimers.get(id)); waitTimers.delete(id); }
+    loadTasks.set(id, { label, done, total, detail: detail || '', wait: false });
+    renderLoad();
+  }
+  function endTask(id) {
+    if (waitTimers.has(id)) { clearTimeout(waitTimers.get(id)); waitTimers.delete(id); }
+    if (loadTasks.delete(id)) renderLoad();
+  }
+  // Auf benötigte Daten vom Admin warten; nach 25 s ohne Antwort aufgeben
+  const gaveUp = new Map();
+  function waitFor(key) {
+    if (loadTasks.has(key) || incoming.has(key)) return;
+    if (gaveUp.has(key) && performance.now() - gaveUp.get(key) < 120000) return;
+    loadTasks.set(key, { label: `Warte auf ${labelFor(key)}`, done: 0, total: 0, detail: 'Anfrage an Mitspieler gesendet', wait: true });
+    waitTimers.set(key, setTimeout(() => { waitTimers.delete(key); if (loadTasks.get(key) && loadTasks.get(key).wait) { loadTasks.delete(key); gaveUp.set(key, performance.now()); renderLoad(); } }, 25000));
+    renderLoad();
+  }
+  function loadPercent() {
+    if (!loadTasks.size) return null;
+    let d = 0, t = 0; for (const x of loadTasks.values()) if (x.total) { d += x.done / x.total; t++; }
+    return t ? Math.min(99, (d / t) * 100) : 0;
+  }
+  function renderLoad() {
+    const ov = $('loadOv');
+    if (!loadTasks.size) { ov.hidden = true; return; }
+    const first = [...loadTasks.values()].sort((a, b) => (a.wait - b.wait))[0];
+    const pct = loadPercent(), indet = [...loadTasks.values()].every(x => !x.total);
+    ov.hidden = false;
+    $('loadTitle').textContent = first.label + (loadTasks.size > 1 ? ` (+${loadTasks.size - 1})` : '');
+    $('loadBar').parentElement.classList.toggle('indet', indet);
+    $('loadBar').style.width = `${pct || 0}%`;
+    $('loadPct').textContent = indet ? 'bitte warten' : `${Math.round(pct)} %`;
+    $('loadDetail').textContent = first.detail;
+    if (document.activeElement && document.activeElement !== document.body && !ov.contains(document.activeElement)) document.activeElement.blur();
   }
 
   // ---------- Chat & Emotes ----------
