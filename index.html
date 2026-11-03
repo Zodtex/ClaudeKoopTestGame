@@ -404,7 +404,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   </div>
 </div>
 <p class="fps" id="fpsBox" hidden></p>
-<p class="ver">v 04.11. 03:15</p>
+<p class="ver">v 04.11. 03:25</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -2737,22 +2737,46 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const porRT = new THREE.WebGLRenderTarget(128, 128); porRT.texture.encoding = THREE.sRGBEncoding;
   const porBuf = new Uint8Array(128 * 128 * 4);
   let porQueue = [], porLast = 0;
+  // Porträt wie in WoW: nur die Figur vor dunklem Hintergrund, Kopf formatfüllend.
+  // Die restliche Welt wird dafür kurz ausgeblendet.
+  const porBg = new THREE.Color(0x1a1d22), porBox = new THREE.Box3(), porTmp = new THREE.Box3(), porV = new THREE.Vector3();
   function shootPortrait(canvasEl, root, height, yaw, hide) {
-    const p = new THREE.Vector3(); root.getWorldPosition(p);
-    const head = p.y + height * 0.8, d = Math.max(0.9, height * 0.95);
-    porCam.position.set(p.x + Math.sin(yaw) * d, head + height * 0.06, p.z + Math.cos(yaw) * d);
-    porCam.lookAt(p.x, head - height * 0.04, p.z);
     const was = hide.map(o => o && o.visible); hide.forEach(o => { if (o) o.visible = false; });
-    const sa = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false; // Schatten nicht neu berechnen
-    renderer.setRenderTarget(porRT); renderer.render(scene, porCam); renderer.setRenderTarget(null);
-    renderer.shadowMap.autoUpdate = sa;
-    hide.forEach((o, i) => { if (o) o.visible = was[i]; });
+    // Alles außer Licht und dieser Figur ausblenden
+    const keep = new Set([root, hemi, sun, sun.target]);
+    let top = root; while (top.parent && top.parent !== scene) top = top.parent;
+    keep.add(top);
+    const vis = scene.children.map(o => o.visible);
+    scene.children.forEach(o => { if (!keep.has(o)) o.visible = false; });
+    // Bei Mitspielern: andere Figuren in derselben Gruppe? Nein – jede Figur ist eine eigene Gruppe in der Szene.
+    root.updateMatrixWorld(true);
+    porBox.makeEmpty();
+    root.traverseVisible(o => {
+      if (!o.isMesh || !o.geometry) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      porTmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); porBox.union(porTmp);
+    });
+    if (porBox.isEmpty()) { root.getWorldPosition(porV); porBox.set(porV.clone(), porV.clone().add(new THREE.Vector3(0, height, 0))); }
+    const h = Math.max(0.3, porBox.max.y - porBox.min.y), c = porBox.getCenter(porV);
+    const headY = porBox.max.y - h * 0.22, d = Math.max(0.6, h * 0.78);
+    porCam.position.set(c.x + Math.sin(yaw) * d, headY + h * 0.04, c.z + Math.cos(yaw) * d);
+    porCam.lookAt(c.x, headY - h * 0.02, c.z);
+    const fog = scene.fog, bg = scene.background; scene.fog = null; scene.background = porBg;
+    const sa = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false;
+    try {
+      renderer.setRenderTarget(porRT); renderer.render(scene, porCam);
+    } finally {
+      renderer.setRenderTarget(null); renderer.shadowMap.autoUpdate = sa;
+      scene.fog = fog; scene.background = bg;
+      scene.children.forEach((o, i) => { o.visible = vis[i]; });
+      hide.forEach((o, i) => { if (o) o.visible = was[i]; });
+    }
     renderer.readRenderTargetPixels(porRT, 0, 0, 128, 128, porBuf);
     const g = canvasEl.getContext('2d'), W = canvasEl.width;
     const img = new ImageData(128, 128);
     for (let y = 0; y < 128; y++) img.data.set(porBuf.subarray((127 - y) * 512, (128 - y) * 512), y * 512);
     if (W === 128) g.putImageData(img, 0, 0);
-    else { const tmp = document.createElement('canvas'); tmp.width = tmp.height = 128; tmp.getContext('2d').putImageData(img, 0, 0); g.drawImage(tmp, 0, 0, W, W); }
+    else { const tmp = document.createElement('canvas'); tmp.width = tmp.height = 128; tmp.getContext('2d').putImageData(img, 0, 0); g.imageSmoothingQuality = 'high'; g.drawImage(tmp, 0, 0, W, W); }
   }
   // Porträts nur bei Bedarf neu (Figur gewechselt, Mitspieler neu, alle 20 s), höchstens eins pro Sekunde:
   // Das Auslesen aus der Grafikkarte kostet kurz Zeit und hat vorher das Ruckeln verursacht.
