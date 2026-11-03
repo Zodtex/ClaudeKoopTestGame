@@ -72,7 +72,7 @@
     "bar": "ui:bar:mainmenubar.png:212369",
     "slot": "ui:slot:ui-quickslot2.png:575",
     "hl": "ui:hl:buttonhilight-square.png:1132",
-    "pf": null,
+    "pf": "ui:pf:ui-targetingframe-plusmob.png:7111",
     "pa": null,
     "sb": null,
     "ss": 1.7,
@@ -84,18 +84,58 @@
           263,
           55
         ]
+      ],
+      "pf": [
+        [
+          24,
+          0,
+          232,
+          100
+        ]
       ]
     },
     "capS": 165,
     "capX": -44,
     "capY": null,
-    "pfX": null,
-    "pfY": null,
-    "pfW": null,
-    "pfF": false,
+    "pfX": 0,
+    "pfY": 0,
+    "pfW": 369,
+    "pfF": true,
     "paX": null,
     "paY": null,
     "paW": null,
-    "paF": false
+    "paF": false,
+    "pfL": {
+      "por": [
+        5,
+        7,
+        64,
+        64
+      ],
+      "lvl": [
+        3.6,
+        50,
+        24,
+        16
+      ],
+      "name": [
+        69.4,
+        16.6,
+        119,
+        14
+      ],
+      "hp": [
+        71.4,
+        32.7,
+        119,
+        12
+      ],
+      "mp": [
+        71.6,
+        44.1,
+        119,
+        12
+      ]
+    }
   }
 }
