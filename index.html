@@ -691,8 +691,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function openDB() {
     return new Promise(res => {
       try {
-        const r = indexedDB.open('wanderfeld', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('slots');
+        const r = indexedDB.open('wanderfeld', 2);
+        r.onupgradeneeded = () => {
+          if (!r.result.objectStoreNames.contains('slots')) r.result.createObjectStore('slots');
+          if (!r.result.objectStoreNames.contains('shared')) r.result.createObjectStore('shared'); // Modelle von Mitspielern
+        };
         r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
       } catch (_) { res(null); }
     });
@@ -881,8 +884,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   async function loadRemoteModel(R, pr) {
     const key = R.mk;
-    const slot = key && slots.find(sl => sl && sl.main && sl.main.toLowerCase() === key && sl.files && sl.files.length);
-    if (!slot) return; // Modell nicht lokal vorhanden: Platzhalter bleibt
+    let slot = key && slots.find(sl => sl && sl.main && sl.main.toLowerCase() === key && sl.files && sl.files.length);
+    if (!slot && key) { const files = await sharedGet(key); if (files) slot = { files }; }
+    if (!slot) { requestModel(R.peer, key); return; } // Mitspieler schickt sein Modell, bis dahin Platzhalter
+    if (R.mk !== key) return;
     try {
       const res = await parseModel(slot.files);
       if (R.mk !== key || !remotes.has(R.peer)) { res.urls.forEach(URL.revokeObjectURL); disposeModel(res.root); return; }
@@ -1000,7 +1005,65 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
+    } else if (msg.t === 'req' || msg.t === 'f') {
+      if (msg.to !== net.id) { if (net.host) netSendTo(msg.to, msg, conn); return; } // Gastgeber leitet weiter
+      if (msg.t === 'req') sendMyModel(msg.id, msg.mk);
+      else receiveFile(msg);
     }
+  }
+
+  // ---------- Modelle unter Mitspielern austauschen ----------
+  // Jeder lädt nur seinen eigenen Charakter; die anderen bekommen ihn beim ersten Treffen automatisch
+  // und speichern ihn in ihrem Browser.
+  const requested = new Set(), incoming = new Map();
+  const MAX_SHARE = 60 * 1024 * 1024;
+
+  function netSendTo(id, msg, except) {
+    if (!net.host) { netSend(msg); return; }
+    for (const [c, ids] of connIds) if (ids.has(id) && c !== except && c.open) { try { c.send(msg); } catch (_) {} return; }
+  }
+  function sharedGet(key) {
+    return new Promise(res => {
+      if (!db) return res(null);
+      try { const r = db.transaction('shared').objectStore('shared').get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); }
+      catch (_) { res(null); }
+    });
+  }
+  function sharedPut(key, files) {
+    if (!db) return;
+    try { db.transaction('shared', 'readwrite').objectStore('shared').put(files, key); } catch (e) { console.warn(e); }
+  }
+  function requestModel(fromId, key) {
+    const tag = fromId + '|' + key;
+    if (!net.ready || !key || requested.has(tag)) return;
+    requested.add(tag);
+    setTimeout(() => requested.delete(tag), 30000); // nach 30 s darf erneut gefragt werden
+    netSendTo(fromId, { t: 'req', id: net.id, to: fromId, mk: key });
+  }
+  async function sendMyModel(toId, key) {
+    const sl = slots.find(x => x && x.main && x.main.toLowerCase() === key && x.files && x.files.length);
+    if (!sl) return;
+    const files = sl.files.filter(f => MODEL_EXT.test(f.name));
+    let total = 0;
+    for (let i = 0; i < files.length; i++) {
+      const buf = await files[i].arrayBuffer();
+      total += buf.byteLength; if (total > MAX_SHARE) return;
+      netSendTo(toId, { t: 'f', id: net.id, to: toId, mk: key, i, n: files.length, name: files[i].name, buf });
+    }
+  }
+  function receiveFile(m) {
+    if (m && ArrayBuffer.isView(m.buf)) m.buf = m.buf.buffer.slice(m.buf.byteOffset, m.buf.byteOffset + m.buf.byteLength);
+    if (typeof m.mk !== 'string' || typeof m.name !== 'string' || !MODEL_EXT.test(m.name) || !(m.buf instanceof ArrayBuffer)) return;
+    if (!Number.isInteger(m.n) || m.n < 1 || m.n > 400 || !Number.isInteger(m.i) || m.i < 0 || m.i >= m.n) return;
+    let inc = incoming.get(m.mk);
+    if (!inc || inc.n !== m.n) { inc = { n: m.n, files: new Array(m.n), got: 0, size: 0 }; incoming.set(m.mk, inc); }
+    if (inc.files[m.i]) return;
+    inc.size += m.buf.byteLength; if (inc.size > MAX_SHARE) { incoming.delete(m.mk); return; }
+    inc.files[m.i] = new File([m.buf], m.name.split(/[\\/]/).pop()); inc.got++;
+    if (inc.got < inc.n) return;
+    incoming.delete(m.mk);
+    sharedPut(m.mk, inc.files);
+    for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
   }
   function wireConn(conn) {
     conn.on('open', () => {
