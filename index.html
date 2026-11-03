@@ -191,7 +191,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 22:10</p>
+<p class="ver">v 03.11. 22:20</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -263,6 +263,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           <button class="btn ghost" id="rotL" title="90° nach links">⟲ 90°</button>
           <button class="btn ghost" id="rotR" title="90° nach rechts">⟳ 90°</button>
         </div>
+      </div>
+      <div class="field">
+        <label for="lift">Über Boden</label>
+        <div><input type="range" id="lift" min="-1" max="2" step="0.05" value="0"><span class="val" id="liftVal">0.00 m</span></div>
       </div>
       <label class="check"><input type="checkbox" id="alpha"> Alpha-Cutout (für Haare, Blätter, Umhänge)</label>
       <div class="field anim">
@@ -861,6 +865,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('height').value = settings?.height ?? 2;
     $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
     rotOffset = settings?.rot ?? -Math.PI / 2;
+    $('lift').value = settings?.lift ?? 0; $('liftVal').textContent = `${(+$('lift').value).toFixed(2)} m`;
     $('alpha').checked = !!settings?.alpha;
     applyAlpha();
     fitModel();
@@ -922,6 +927,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     }
     const target = parseFloat($('height').value);
     myFit = fitInto(pivot, model, target, rotOffset);
+    const lift = +$('lift').value || 0; // Füße etwas anheben, falls die Animation in den Boden ragt
+    if (myFit) { model.position.y += lift; myFit.of[1] += lift; }
     modelHeight = target;
   }
 
@@ -965,6 +972,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   $('rotL').onclick = () => { rotOffset += Math.PI / 2; fitModel(); saveSettings(); };
   $('rotR').onclick = () => { rotOffset -= Math.PI / 2; fitModel(); saveSettings(); };
   $('alpha').onchange = () => { applyAlpha(); saveSettings(); };
+  $('lift').oninput = e => { $('liftVal').textContent = `${(+e.target.value).toFixed(2)} m`; fitModel(); saveSettings(); };
   ANIMS.forEach(a => $(a.id).onchange = () => { applyAnims(); saveSettings(); });
   document.querySelectorAll('.pv').forEach(b => b.onclick = () => {
     const sel = $(b.dataset.for); if (!mixer || sel.value === '') return;
@@ -1040,7 +1048,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function saveSettings(now) {
     const slot = slots[active]; if (!slot || !model) return;
-    slot.settings = { height: +$('height').value, rot: rotOffset, alpha: $('alpha').checked,
+    slot.settings = { height: +$('height').value, rot: rotOffset, alpha: $('alpha').checked, lift: +$('lift').value || 0,
       ...Object.fromEntries(ANIMS.map(a => [a.k, clipName($(a.id))])) };
     clearTimeout(saveTimer);
     if (isAdmin && rosterSource === 'repo' && slot.mk) {
@@ -1061,7 +1069,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const has = sl && sl.files && sl.files.length;
       b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
       b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
-      b.querySelector('.meta').textContent = has ? (sl.file || sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? (net.ready ? 'wird übertragen …' : 'fehlt · Spiel beitreten') : 'wird übertragen …') : 'Leer · Platzhalter';
+      b.querySelector('.meta').textContent = has ? 'Bereit' : (sl && sl.mk) ? (rosterSource === 'repo' ? (net.ready ? 'wird übertragen …' : 'fehlt · Spiel beitreten') : 'wird übertragen …') : 'Leer · Platzhalter';
       b.onclick = () => activateSlot(i);
       b.ondblclick = () => { activateSlot(i); enterPlay(); };
       list.append(b);
@@ -1664,6 +1672,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
     const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
     if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
+    if (Number.isFinite(c.lift)) settings.lift = Math.max(-1, Math.min(2, c.lift));
     ANIM_KEYS.forEach(k => { if (typeof c[k] === 'string' || c[k] === null) settings[k] = c[k]; });
     if (isAdmin && overrides[mk]) Object.assign(settings, overrides[mk]);
     const sl = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
@@ -2556,6 +2565,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const clean = {};
     if (Number.isFinite(set.height)) clean.height = Math.min(8, Math.max(0.5, set.height));
     if (Number.isFinite(set.rot)) clean.rot = set.rot;
+    if (Number.isFinite(set.lift)) clean.lift = Math.max(-1, Math.min(2, set.lift));
     clean.alpha = !!set.alpha;
     ANIM_KEYS.forEach(k => { if (typeof set[k] === 'string' || set[k] === null) clean[k] = set[k]; });
     const i = slots.findIndex(sl => sl && sl.mk === mk); if (i < 0) return;
@@ -2565,6 +2575,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function liveSettings(set) {
     $('height').value = set.height ?? 2; $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
     if (Number.isFinite(set.rot)) rotOffset = set.rot;
+    $('lift').value = set.lift ?? 0; $('liftVal').textContent = `${(+$('lift').value).toFixed(2)} m`;
     $('alpha').checked = !!set.alpha;
     if (clips.length) { ANIMS.forEach(a => selectByName($(a.id), set[a.k])); applyAnims(); }
     applyAlpha(); fitModel();
@@ -2573,6 +2584,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const characters = slots.filter(sl => sl && sl.mk).map(sl => {
       const st = sl.settings || {}, o = { name: sl.name, path: sl.path, height: +(st.height ?? 2).toFixed(2), alpha: !!st.alpha };
       if (Number.isFinite(st.rot) && Math.abs(st.rot + Math.PI / 2) > 1e-3) o.rotation = Math.round(st.rot * 180 / Math.PI);
+      if (st.lift) o.lift = +(+st.lift).toFixed(2);
       ANIM_KEYS.forEach(k => { if (st[k] !== undefined) o[k] = st[k]; });
       return o;
     });

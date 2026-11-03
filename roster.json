@@ -35,7 +35,8 @@
       "back": null,
       "sl": null,
       "sr": null,
-      "jump": null
+      "jump": null,
+      "lift": 0.3
     }
   ],
   "map": {
