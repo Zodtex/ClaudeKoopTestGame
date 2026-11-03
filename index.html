@@ -191,7 +191,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 21:50</p>
+<p class="ver">v 03.11. 22:10</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -215,20 +215,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="status" id="selStatus">Lade gespeicherte Charaktere …</div>
     <button class="btn ghost danger" id="slotClear" hidden>Platz leeren</button>
     <div class="coop">
-      <span class="lbl">Koop</span>
-      <div class="btnrow">
+      <span class="lbl">Welt</span>
+      <div class="btnrow" hidden>
         <button class="btn ghost" id="hostBtn">Spiel erstellen</button>
       </div>
       <label class="check" id="fixRosterRow" hidden><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
-      <div class="joinrow">
+      <div class="joinrow" hidden>
         <input type="text" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Spielcode">
         <button class="btn ghost" id="joinBtn">Beitreten</button>
       </div>
       <div class="codebox" id="codeBox" hidden>Code: <b id="codeVal"></b> <button class="iconbtn" id="copyCode">kopieren</button></div>
-      <div class="netstate" id="netState">Allein unterwegs.</div>
+      <div class="netstate" id="netState">Verbinde …</div>
     </div>
     <button class="btn play" id="playBtn">Spielen</button>
-    <p class="hint">Koop: Einer klickt „Spiel erstellen" und schickt den Code, die anderen geben ihn ein und klicken „Beitreten". Fehlende Charaktere kommen dabei automatisch vom Admin.</p>
+    <p class="hint">Alle, die das Spiel öffnen, sind automatisch in derselben Welt. Fehlende Charaktere und die Karte kommen dabei automatisch vom Admin.</p>
   </div>
 </aside>
 
@@ -1046,7 +1046,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (isAdmin && rosterSource === 'repo' && slot.mk) {
       overrides[slot.mk] = slot.settings;
       try { localStorage.setItem('wf-roster-overrides', JSON.stringify(overrides)); } catch (_) {}
-      saveTimer = setTimeout(() => { if (net.host && net.ready) netSend({ t: 'cfg', id: net.id, mk: slot.mk, settings: slot.settings }); }, 250);
+      saveTimer = setTimeout(() => { if (net.ready) netSend({ t: 'cfg', id: net.id, mk: slot.mk, settings: slot.settings }); }, 250);
       return;
     }
     if (now) dbPut(active); else saveTimer = setTimeout(() => dbPut(active), 300);
@@ -1274,7 +1274,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     const head = document.createElement('div'); head.className = 'ttl';
     const others = [...netStates.entries()].map(([id, st]) => ({ peer: id, presence: st, guest: false }));
     head.innerHTML = '<span>Gruppe</span><span class="dot"></span>';
-    head.querySelector('.dot').textContent = !net.peer ? 'solo' : !net.ready ? 'verbinde …' : `${others.length + 1} online${net.code ? ' · ' + net.code : ''}`;
+    head.querySelector('.dot').textContent = !net.peer ? 'solo' : !net.ready ? 'verbinde …' : `${others.length + 1} online`;
     box.append(head);
     const row = (hue, label, note) => {
       const d = document.createElement('div'); d.className = 'mem';
@@ -1383,9 +1383,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (net.host && conn) netSend(msg, conn); // Gastgeber verteilt an alle
       receiveChat(msg);
     } else if (msg.t === 'map') {
-      if (!net.host) setMapCfg(msg.map, msg.id);
+      if (net.host && conn) netSend(msg, conn); // Gastgeber verteilt Admin-Änderungen
+      setMapCfg(msg.map, msg.id);
     } else if (msg.t === 'cfg') {
-      if (!net.host && rosterSource === 'repo') applyCfg(msg.mk, msg.settings);
+      if (net.host && conn) netSend(msg, conn);
+      if (rosterSource === 'repo') applyCfg(msg.mk, msg.settings);
     } else if (msg.t === 'roster') {
       if (!net.host) applyRoster(msg.id, msg.list);
     } else if (msg.t === 'req' || msg.t === 'f') {
@@ -1521,16 +1523,29 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() });
         if (isAdmin && rosterSource === 'repo') for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings });
         if (isAdmin) conn.send({ t: 'map', id: net.id, map: mapCfg }); } // Neuankömmling bekommt alle bekannten Stände
-      else { netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok'); if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); } }
-      if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
+      else {
+        clearTimeout(net.joinTimer);
+        netMsg('Mit der Welt verbunden.', 'ok');
+        if (rosterSource === 'repo') { renderSlots(); if (!model) activateSlot(active); }
+        if (isAdmin) { // Admin als Gast: aktuelle Einstellungen über den Gastgeber an alle
+          for (const sl of slots) if (sl && sl.mk && sl.settings) conn.send({ t: 'cfg', id: net.id, mk: sl.mk, settings: sl.settings });
+          conn.send({ t: 'map', id: net.id, map: mapCfg });
+        }
+      }
+      if (net.host) netMsg(`Welt offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
     });
     conn.on('data', d => netReceive(d, conn));
     const gone = () => {
       if (!net.conns.has(conn)) return;
       net.conns.delete(conn);
-      if (net.host) { (connIds.get(conn) || []).forEach(netDrop); connIds.delete(conn); netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok'); }
-      else { for (const id of [...netStates.keys()]) netDrop(id); net.ready = false; leaveRoster(); netMsg('Verbindung zum Gastgeber verloren.', 'err'); }
+      if (net.host) { (connIds.get(conn) || []).forEach(netDrop); connIds.delete(conn); netMsg(`Welt offen · ${net.conns.size} Mitspieler verbunden.`, 'ok'); }
+      else {
+        for (const id of [...netStates.keys()]) netDrop(id); net.ready = false;
+        // Gastgeber weg: neu verbinden, notfalls selbst die Welt übernehmen
+        netMsg('Verbindung verloren – verbinde neu …', 'err');
+        setTimeout(autoJoin, 800 + Math.random() * 2200);
+      }
       renderParty();
     };
     conn.on('close', gone); conn.on('error', gone);
@@ -1580,6 +1595,46 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       renderParty();
     });
     renderParty();
+  }
+  // ---------- Dauerhafte Welt ----------
+  // Feste Adresse statt Code: Wer zuerst da ist, hält die Welt offen, alle anderen verbinden sich automatisch.
+  // Geht der Gastgeber, übernimmt einer der Verbliebenen.
+  const WORLD_ID = 'wanderfeld-' + (location.hostname + location.pathname).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+  let autoBusy = false;
+  function autoJoin() {
+    if (typeof Peer === 'undefined') { netMsg('Koop-Bibliothek nicht geladen. Bist du online?', 'err'); return; }
+    if (autoBusy) return; autoBusy = true;
+    netReset();
+    netMsg('Suche die Welt …');
+    const p = net.peer = new Peer();
+    const fail = () => { if (net.peer !== p) return; autoBusy = false; autoHost(); };
+    p.on('open', () => {
+      const conn = p.connect(WORLD_ID, { reliable: true });
+      wireConn(conn);
+      conn.on('open', () => { autoBusy = false; });
+      net.joinTimer = setTimeout(() => { if (!net.ready && net.peer === p) fail(); }, 12000);
+    });
+    p.on('error', e => {
+      if (e.type === 'peer-unavailable') fail();
+      else { autoBusy = false; netMsg(`Verbindung fehlgeschlagen (${e.type || e.message}). Neuer Versuch …`, 'err'); setTimeout(autoJoin, 4000 + Math.random() * 3000); }
+    });
+    renderParty();
+  }
+  function autoHost() {
+    if (autoBusy) return; autoBusy = true;
+    netReset();
+    net.host = true;
+    netMsg('Öffne die Welt …');
+    const p = net.peer = new Peer(WORLD_ID);
+    p.on('open', () => { autoBusy = false; net.ready = true; lastSent = ''; netMsg('Welt offen. Wer das Spiel öffnet, landet automatisch hier.', 'ok'); renderParty(); });
+    p.on('connection', wireConn);
+    p.on('error', e => {
+      autoBusy = false;
+      // Jemand anderes war schneller (oder die alte Welt ist noch registriert): dort beitreten
+      if (e.type === 'unavailable-id') setTimeout(autoJoin, 1000 + Math.random() * 2000);
+      else if (e.type !== 'peer-unavailable') { netMsg(`Fehler: ${e.type || e.message}. Neuer Versuch …`, 'err'); setTimeout(autoJoin, 4000); }
+    });
+    p.on('disconnected', () => { if (net.peer === p && !p.destroyed) { try { p.reconnect(); } catch (_) {} } });
   }
   $('hostBtn').onclick = () => hostGame();
   $('fixRoster').onchange = () => scheduleRoster();
@@ -1901,7 +1956,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (document.activeElement !== $('mapName')) $('mapName').value = mapCfg ? mapCfg.name : '';
     renderEnvAdmin();
   }
-  function broadcastMap() { if (net.host && net.ready) netSend({ t: 'map', id: net.id, map: mapCfg }); }
+  function broadcastMap() { if (isAdmin && net.ready) netSend({ t: 'map', id: net.id, map: mapCfg }); }
 
   $('mapFolder').onclick = () => $('mapInput').click();
   $('mapInput').onchange = async e => {
@@ -2607,6 +2662,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     enterSelect();
     activateSlot(first >= 0 ? first : 0);
     startCoop();
+    autoJoin();
     if (!db) status('Speichern ist in diesem Browserfenster nicht möglich (z. B. privates Fenster). Modelle gehen beim Neuladen verloren.', 'err');
   })();
   tick();
