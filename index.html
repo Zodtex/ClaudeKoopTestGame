@@ -29,7 +29,23 @@ body { background: var(--night); color: var(--parch); font-family: var(--f-body)
 .brand { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 .brand h1 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 22px; letter-spacing: 0.08em; color: var(--parch); text-shadow: 0 2px 8px rgba(0,0,0,.6); }
 .ver { position: fixed; z-index: 2; left: max(8px, env(safe-area-inset-left, 0px)); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); margin: 0; font: 10px var(--f-mono); color: var(--parch); opacity: 0.55; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
-.keys { margin-bottom: 14px; }
+/* Chat unten links */
+.chat { left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.chatlog { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow: hidden; justify-content: flex-end; font-size: 13.5px; line-height: 1.35; }
+.chatlog .ln { text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.8); color: #fff; transition: opacity 1.2s; overflow-wrap: anywhere; }
+.chatlog .ln b { color: #ffd88a; font-weight: 600; }
+.chatlog .ln.emote { color: #ff9a5c; }
+.chatlog .ln.sys { color: #f5e66a; }
+.chatlog .ln.old { opacity: 0; }
+.chat.open .chatlog .ln.old { opacity: 0.85; }
+.chat.open .chatlog { background: rgba(10,13,17,0.45); border-radius: 4px; padding: 4px 6px; }
+#chatInput { pointer-events: auto; font: 13.5px var(--f-body); padding: 7px 9px; background: rgba(10,13,17,0.82); border: 1px solid rgba(208,166,78,0.55); color: #fff; border-radius: 4px; }
+/* Minimap oben rechts */
+.minimap { top: calc(64px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.minimap canvas { width: 170px; height: 170px; display: block; }
+.minimap .mmzone { font: 600 12px var(--f-display); letter-spacing: 0.08em; color: var(--gold); text-shadow: 0 1px 3px #000; max-width: 190px; text-align: center; }
+.minimap .mmzoom { position: absolute; right: -4px; bottom: 26px; display: flex; flex-direction: column; gap: 3px; }
+.minimap .mmzoom button { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(208,166,78,0.7); background: rgba(17,22,28,0.9); color: var(--parch); font: 600 13px/1 var(--f-mono); cursor: pointer; padding: 0; }
 .brand p { margin: 2px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-shadow: 0 1px 4px rgba(0,0,0,.8); }
 
 .panel { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 290px; max-height: calc(100% - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
@@ -66,8 +82,14 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 .check { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
 .check input { accent-color: var(--gold); }
 
-.keys { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
-  display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.keys { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
+  display: grid; grid-template-columns: auto auto; gap: 3px 12px; font-size: 12px; color: var(--muted); }
+.keys .keyshead { grid-column: 1 / -1; background: none; border: 0; padding: 0 0 4px; text-align: left; color: var(--gold); font: 11px var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; }
+.keys .keyshead::after { content: " ▾"; color: var(--muted); }
+.keys.collapsed { padding: 6px 12px; }
+.keys.collapsed .keyshead { padding: 0; }
+.keys.collapsed .keyshead::after { content: " ▸"; }
+.keys.collapsed > :not(.keyshead) { display: none; }
 .keys kbd { font-family: var(--f-mono); font-size: 11px; color: var(--parch); }
 
 .drop { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(10,13,17,0.72); border: 2px dashed var(--gold); font-family: var(--f-display); font-size: 22px; letter-spacing: 0.08em; color: var(--gold); pointer-events: none; }
@@ -123,6 +145,10 @@ input[type=text] { width: 100%; min-width: 0; background: #1b2229; color: var(--
 @media (max-width: 640px) {
   .panel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; max-height: 55%; }
   .keys { display: none; }
+  .minimap canvas { width: 112px; height: 112px; }
+  .minimap .mmzoom { bottom: 20px; }
+  .chat { width: calc(100% - 32px); }
+  .chatlog { max-height: 110px; font-size: 12.5px; }
   .party { top: calc(60px + env(safe-area-inset-top, 0px)); }
   .namebar { left: auto; right: max(16px, env(safe-area-inset-right, 0px)); transform: none; width: 46%; min-width: 0; }
 }
@@ -139,7 +165,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 19:45</p>
+<div class="hud chat" id="chat" hidden>
+  <div class="chatlog" id="chatLog" aria-live="polite"></div>
+  <input type="text" id="chatInput" maxlength="200" placeholder="Nachricht oder /tanzen, /winken, /e …" autocomplete="off" spellcheck="false" aria-label="Chat" hidden>
+</div>
+<div class="hud minimap" id="minimap" hidden>
+  <canvas id="mmCanvas" width="340" height="340" aria-label="Minimap"></canvas>
+  <div class="mmzone" id="mmZone">Übungsfeld</div>
+  <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
+</div>
+<p class="ver">v 03.11. 20:15</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -259,6 +294,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </aside>
 
 <div class="hud keys" id="keys" aria-label="Steuerung" hidden>
+  <button class="keyshead" id="keysToggle" aria-expanded="true">Steuerung</button>
+  <kbd>Enter</kbd><span>Chat · /tanzen, /winken …</span>
   <kbd>W / S</kbd><span>vor / rückwärts</span>
   <kbd>A / D</kbd><span>drehen</span>
   <kbd>Q / E</kbd><span>seitwärts</span>
@@ -500,6 +537,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type === 'text')); };
   addEventListener('keydown', e => {
     if (typing() || mode !== 'play') return;
+    if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === '/') { e.preventDefault(); openChat(e.key === '/' ? '/' : ''); return; }
     if (e.code === 'NumLock' || e.code === 'KeyR') { if (!e.repeat) autorun = !autorun; }
     if (e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'ArrowUp' || e.code === 'ArrowDown') autorun = false;
     keys.add(e.code);
@@ -631,7 +669,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     let dl = leanTarget - lean; lean += dl * Math.min(1, dt * 10);
     leanGroup.rotation.y = lean;
 
-    if (emote && moveState !== 'idle') stopEmote();
+    if (emote && (moveState !== 'idle' || (emoteUntil && performance.now() > emoteUntil))) stopEmote();
     if (mixer) {
       setAction(pickAction(acts, moveState, emoteAct, current));
       if (acts.walk) acts.walk.timeScale = (moveState === 'back' && !acts.back) ? -0.7 : 1;
@@ -667,6 +705,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('coords').textContent = `${mapLoaded && mapCfg ? mapCfg.name + ' · ' : ''}x ${player.position.x.toFixed(1)} · z ${player.position.z.toFixed(1)}${autorun ? ' · Autolauf' : ''}`;
 
     updateEnvFrame(dt);
+    drawMinimap();
+    tickBubbles();
     coopUpdate(dt);
     resize();
     renderer.render(scene, camera);
@@ -1039,7 +1079,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function enterPlay() {
     mode = 'play'; resetPlayer();
-    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false;
+    $('selectPanel').hidden = true; $('panel').hidden = false; $('keys').hidden = false; $('chat').hidden = false; $('minimap').hidden = false;
     renderNameBar(); renderParty();
     canvas.focus();
   }
@@ -1047,7 +1087,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     mode = 'select'; keys.clear(); autorun = false; lmb = rmb = false;
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     resetPlayer();
-    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true;
+    $('selectPanel').hidden = false; $('panel').hidden = true; $('keys').hidden = true; $('chat').hidden = true; $('minimap').hidden = true; closeChat();
     renderSlots(); renderNameBar(); renderParty();
   }
 
@@ -1147,7 +1187,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function removeRemote(peer) {
     const R = remotes.get(peer); if (!R) return;
-    dropRemoteModel(R); scene.remove(R.group); remotes.delete(peer);
+    clearBubble(R); dropRemoteModel(R); scene.remove(R.group); remotes.delete(peer);
   }
   function applyRemoteLook(R, pr) {
     R.h = typeof pr.h === 'number' ? Math.min(8, Math.max(0.5, pr.h)) : 2;
@@ -1235,6 +1275,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       let df = Math.atan2(Math.sin(t.f - g.rotation.y), Math.cos(t.f - g.rotation.y)); g.rotation.y += df * k;
       R.leanG.rotation.y += (t.l - R.leanG.rotation.y) * k;
       if (R.tag) R.tag.position.y = (R.model ? R.h : 2) + 0.35;
+      if (R.bubble) R.bubble.position.y = (R.model ? R.h : 2) + 0.75 + R.bubble.scale.y / 2;
       if (R.mixer) {
         const a = R.acts;
         if (t.em !== R.emName) { R.emName = t.em; const c = t.em ? R.clips.find(c => c.name === t.em) : null; R.emAct = c ? R.mixer.clipAction(c) : null; }
@@ -1314,6 +1355,9 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
+    } else if (msg.t === 'chat') {
+      if (net.host && conn) netSend(msg, conn); // Gastgeber verteilt an alle
+      receiveChat(msg);
     } else if (msg.t === 'map') {
       if (!net.host) setMapCfg(msg.map, msg.id);
     } else if (msg.t === 'cfg') {
@@ -1786,7 +1830,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       }
       spawn.set(...(found || [0, 0, 0])); spawnFacing = 0;
       applySpawn();
-      mapLoaded = true; renderEnvAdmin();
+      mapLoaded = true; renderEnvAdmin(); scheduleMinimap();
       if (mode !== 'play' || !found || groundAt(player.position.x, player.position.z) === null) resetPlayer();
       mapMsg(`${mapCfg ? mapCfg.name : 'Karte'} geladen · ${tiles.length} Kachel${tiles.length === 1 ? '' : 'n'}${placed ? ` · ${placed} Objekte` : ''}.`, 'ok');
     } catch (e) {
@@ -1800,7 +1844,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (water) water.visible = false;
     if (restore) {
       propsGroup.visible = true; ground.visible = true;
-      applyEnv();
+      applyEnv(); scheduleMinimap();
       spawn.set(0, 0, 0); resetPlayer();
     }
   }
@@ -1931,7 +1975,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   let envTimer = 0;
   function envChanged() {
-    applyEnv(); updateWater(); renderEnvAdmin();
+    applyEnv(); updateWater(); renderEnvAdmin(); scheduleMinimap();
     clearTimeout(envTimer); envTimer = setTimeout(broadcastMap, 300);
   }
   const setWater = patch => { if (!mapCfg) return; mapCfg.water = Object.assign({ on: false, level: 0 }, mapCfg.water, patch); envChanged(); };
@@ -1999,8 +2043,217 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     }
   }
 
+  // ---------- Chat & Emotes ----------
+  const EMOTES = [
+    { cmd: ['tanzen', 'tanz', 'dance'], re: /^emotedance/i, text: 'tanzt' },
+    { cmd: ['winken', 'wink', 'wave'], re: /^emotewave/i, text: 'winkt', once: true },
+    { cmd: ['jubeln', 'jubel', 'cheer'], re: /^emotecheer/i, text: 'jubelt', once: true },
+    { cmd: ['lachen', 'lol', 'laugh'], re: /^emotelaugh/i, text: 'lacht', once: true },
+    { cmd: ['verbeugen', 'bow'], re: /^emotebow/i, text: 'verbeugt sich', once: true },
+    { cmd: ['klatschen', 'applaus', 'applaud'], re: /^emoteapplaud/i, text: 'klatscht Beifall', once: true },
+    { cmd: ['brüllen', 'bruellen', 'roar'], re: /^emoteroar/i, text: 'brüllt', once: true },
+    { cmd: ['weinen', 'cry'], re: /^emotecry/i, text: 'weint', once: true },
+    { cmd: ['zeigen', 'point'], re: /^emotepoint/i, text: 'zeigt nach vorn', once: true },
+    { cmd: ['salutieren', 'salute'], re: /^emotesalute/i, text: 'salutiert', once: true },
+    { cmd: ['knien', 'kneel'], re: /^(emote)?kneel/i, text: 'kniet nieder' },
+    { cmd: ['sitzen', 'sit'], re: /^sitground\s/i, text: 'setzt sich' },
+    { cmd: ['schlafen', 'sleep'], re: /^sleep\s/i, text: 'schläft ein' },
+  ];
+  const chatLines = [];
+  let chatRate = [];
+  function addChatLine(kind, name, text) {
+    const log = $('chatLog');
+    const d = document.createElement('div'); d.className = 'ln ' + kind;
+    if (kind === 'say') { const b = document.createElement('b'); b.textContent = `[${name}]: `; d.append(b, document.createTextNode(text)); }
+    else d.textContent = kind === 'emote' ? `${name} ${text}` : text;
+    log.append(d); chatLines.push(d);
+    while (log.children.length > 40) log.firstChild.remove();
+    setTimeout(() => d.classList.add('old'), 12000);
+  }
+  function openChat(prefill) {
+    if (mode !== 'play') return;
+    keys.clear(); lmb = rmb = false;
+    $('chat').classList.add('open');
+    const inp = $('chatInput'); inp.hidden = false; inp.value = prefill || ''; inp.focus();
+  }
+  function closeChat() {
+    $('chat').classList.remove('open');
+    const inp = $('chatInput'); inp.value = ''; inp.hidden = true;
+    if (document.activeElement === inp) inp.blur();
+    canvas.focus({ preventScroll: true });
+  }
+  $('chatInput').addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeChat(); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const txt = $('chatInput').value.trim().slice(0, 200);
+    closeChat();
+    if (txt) submitChat(txt);
+  });
+  $('chatInput').addEventListener('blur', () => { if (!$('chatInput').hidden) setTimeout(() => { if (document.activeElement !== $('chatInput')) closeChat(); }, 0); });
+
+  function sendChat(kind, text) {
+    const msg = { t: 'chat', id: net.id, k: kind, n: shownName(), txt: text };
+    if (net.ready) netSend(msg);
+    showChat(msg, true);
+  }
+  function submitChat(txt) {
+    if (txt.startsWith('/')) {
+      const [cmd, ...rest] = txt.slice(1).split(/\s+/);
+      const c = cmd.toLowerCase();
+      if (c === 'e' || c === 'me' || c === 'emote') { const t = rest.join(' ').trim(); if (t) sendChat('emote', t); return; }
+      if (c === 'hilfe' || c === 'help' || c === '?') {
+        addChatLine('sys', '', 'Emotes: ' + EMOTES.map(e => '/' + e.cmd[0]).join(' ') + ' · eigener Text: /e …');
+        return;
+      }
+      const em = EMOTES.find(e => e.cmd.includes(c));
+      if (em) {
+        const clip = clips.find(cl => em.re.test(cl.name || ''));
+        if (clip && moveState === 'idle') playEmoteClip(clip, em.once);
+        sendChat('emote', em.text + '.');
+        return;
+      }
+      addChatLine('sys', '', `Unbekannter Befehl „/${cmd}". Tippe /hilfe für alle Emotes.`);
+      return;
+    }
+    sendChat('say', txt);
+  }
+  function receiveChat(msg) {
+    if (typeof msg.txt !== 'string' || !msg.txt.trim()) return;
+    const now = performance.now();
+    chatRate = chatRate.filter(t => now - t < 2000); if (chatRate.length > 12) return; chatRate.push(now);
+    showChat(msg, false);
+  }
+  function showChat(msg, mine) {
+    const kind = msg.k === 'emote' ? 'emote' : 'say';
+    const st = netStates.get(msg.id);
+    const name = mine ? shownName() : String((st && st.n) || msg.n || 'Abenteurer').slice(0, 24);
+    const text = String(msg.txt).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 200);
+    addChatLine(kind, name, text);
+    if (kind === 'say') {
+      if (mine) setBubble(selfBubbleHolder, text, true);
+      else { const R = remotes.get(msg.id); if (R) setBubble(R, text, false); }
+    }
+  }
+
+  // Sprechblasen über den Köpfen
+  const selfBubbleHolder = { bubble: null, until: 0 };
+  function bubbleSprite(text) {
+    const words = text.split(/\s+/), lines = []; let cur = '';
+    for (const w of words) { if ((cur + ' ' + w).trim().length > 26 && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+    if (cur) lines.push(cur);
+    if (lines.length > 4) { lines.length = 4; lines[3] = lines[3].slice(0, 23) + '…'; }
+    const c = document.createElement('canvas'), W = 512, LH = 46, H = lines.length * LH + 36;
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,255,255,0.94)'; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 3;
+    g.beginPath(); if (g.roundRect) g.roundRect(4, 4, W - 8, H - 8, 22); else g.rect(4, 4, W - 8, H - 8); g.fill(); g.stroke();
+    g.fillStyle = '#1b1f24'; g.font = '500 34px "Source Sans 3", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach((l, i) => g.fillText(l, W / 2, 18 + LH / 2 + i * LH));
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false, depthTest: false, transparent: true }));
+    sp.scale.set(3.2, 3.2 * H / W, 1); sp.renderOrder = 11;
+    return sp;
+  }
+  function clearBubble(holder) {
+    if (!holder.bubble) return;
+    holder.bubble.parent && holder.bubble.parent.remove(holder.bubble);
+    holder.bubble.material.map.dispose(); holder.bubble.material.dispose(); holder.bubble = null;
+  }
+  function setBubble(holder, text, mine) {
+    clearBubble(holder);
+    holder.bubble = bubbleSprite(text);
+    holder.until = performance.now() + 4000 + text.length * 60;
+    if (mine) { player.add(holder.bubble); holder.bubble.position.y = modelHeight + 0.6 + holder.bubble.scale.y / 2; }
+    else holder.group.add(holder.bubble);
+  }
+  function tickBubbles() {
+    const now = performance.now();
+    if (selfBubbleHolder.bubble) {
+      if (now > selfBubbleHolder.until) clearBubble(selfBubbleHolder);
+      else selfBubbleHolder.bubble.position.y = modelHeight + 0.6 + selfBubbleHolder.bubble.scale.y / 2;
+    }
+    for (const R of remotes.values()) if (R.bubble && now > R.until) clearBubble(R);
+  }
+
+  // ---------- Minimap ----------
+  // Einmal von oben gerendert (Norden oben), danach wird nur der Ausschnitt um die Figur gezeichnet.
+  let mmBase = null, mmBounds = null, mmTimer = 0, mmRadius = 90;
+  function scheduleMinimap() { clearTimeout(mmTimer); mmTimer = setTimeout(renderMinimapBase, 400); }
+  function renderMinimapBase() {
+    const I = mapLoaded && mapIndex ? mapIndex : { minX: -HALF, maxX: HALF, minZ: -HALF, maxZ: HALF };
+    const w = I.maxX - I.minX, d = I.maxZ - I.minZ, S = Math.min(2048, Math.max(512, Math.ceil(Math.max(w, d) * 1.5 / 256) * 256));
+    const W = w >= d ? S : Math.max(64, Math.round(S * w / d)), H = d >= w ? S : Math.max(64, Math.round(S * d / w));
+    const cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, 1, 6000);
+    cam.position.set((I.minX + I.maxX) / 2, 3000, (I.minZ + I.maxZ) / 2); cam.up.set(0, 0, -1); cam.lookAt((I.minX + I.maxX) / 2, 0, (I.minZ + I.maxZ) / 2);
+    const rt = new THREE.WebGLRenderTarget(W, H); rt.texture.encoding = THREE.sRGBEncoding;
+    const hide = [player, ...[...remotes.values()].map(R => R.group)].filter(o => o.visible);
+    hide.forEach(o => o.visible = false);
+    const fog = scene.fog, bg = scene.background; scene.fog = null; scene.background = new THREE.Color(0x10161c);
+    try {
+      renderer.setRenderTarget(rt); renderer.render(scene, cam);
+      const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const img = c.getContext('2d').createImageData(W, H);
+      for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); // Zeilen umdrehen
+      c.getContext('2d').putImageData(img, 0, 0);
+      mmBase = c; mmBounds = { ...I, W, H };
+    } catch (e) { console.warn('Minimap', e); }
+    finally {
+      renderer.setRenderTarget(null); rt.dispose();
+      scene.fog = fog; scene.background = bg; hide.forEach(o => o.visible = true);
+    }
+  }
+  function drawMinimap() {
+    if (mode !== 'play') return;
+    const cv = $('mmCanvas'), g = cv.getContext('2d'), N = cv.width, C = N / 2, Rr = C - 6;
+    g.clearRect(0, 0, N, N);
+    g.save(); g.beginPath(); g.arc(C, C, Rr, 0, Math.PI * 2); g.clip();
+    g.fillStyle = '#10161c'; g.fillRect(0, 0, N, N);
+    const P = player.position, s = Rr / mmRadius; // Pixel pro Yard
+    if (mmBase && mmBounds) {
+      const B = mmBounds, kx = B.W / (B.maxX - B.minX), kz = B.H / (B.maxZ - B.minZ);
+      const sx = (P.x - mmRadius - B.minX) * kx, sy = (P.z - mmRadius - B.minZ) * kz;
+      g.imageSmoothingEnabled = true;
+      g.drawImage(mmBase, sx, sy, mmRadius * 2 * kx, mmRadius * 2 * kz, C - Rr, C - Rr, Rr * 2, Rr * 2);
+    }
+    // Startpunkt
+    if (mapLoaded) { const x = C + (spawn.x - P.x) * s, y = C + (spawn.z - P.z) * s; g.fillStyle = '#fff'; g.font = '600 20px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('✦', x, y); }
+    // Mitspieler
+    for (const [id, R] of remotes) {
+      if (!R.group.visible) continue;
+      let x = C + (R.group.position.x - P.x) * s, y = C + (R.group.position.z - P.z) * s;
+      const dx = x - C, dy = y - C, dd = Math.hypot(dx, dy);
+      if (dd > Rr - 8) { x = C + dx / dd * (Rr - 8); y = C + dy / dd * (Rr - 8); } // am Rand festhalten
+      const st = netStates.get(id); const hue = st && Number.isFinite(st.c) ? st.c : 0;
+      g.fillStyle = `hsl(${hue} 70% 60%)`; g.strokeStyle = '#000'; g.lineWidth = 2;
+      g.beginPath(); g.arc(x, y, 7, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    g.restore();
+    // Rand
+    g.lineWidth = 6; g.strokeStyle = '#b8924a'; g.beginPath(); g.arc(C, C, Rr, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 2; g.strokeStyle = '#3b2f1a'; g.beginPath(); g.arc(C, C, Rr + 3, 0, Math.PI * 2); g.stroke();
+    // Norden
+    g.fillStyle = '#ffd88a'; g.font = '600 22px "Cinzel", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('N', C, 16);
+    // Eigene Figur: Pfeil in Blickrichtung
+    g.save(); g.translate(C, C); g.rotate(Math.atan2(Math.cos(facing), Math.sin(facing)) + Math.PI / 2);
+    g.beginPath(); g.moveTo(0, -14); g.lineTo(9, 10); g.lineTo(0, 5); g.lineTo(-9, 10); g.closePath();
+    g.fillStyle = '#ffd34d'; g.strokeStyle = '#000'; g.lineWidth = 2.5; g.fill(); g.stroke(); g.restore();
+    const zone = mapLoaded && mapCfg ? mapCfg.name : 'Übungsfeld';
+    if ($('mmZone').textContent !== zone) $('mmZone').textContent = zone;
+  }
+  $('mmIn').onclick = () => { mmRadius = Math.max(30, mmRadius / 1.4); };
+  $('mmOut').onclick = () => { mmRadius = Math.min(500, mmRadius * 1.4); };
+  let keysCollapsed = false;
+  try { keysCollapsed = localStorage.getItem('wf-keys') === '1'; } catch (_) {}
+  const renderKeys = () => { $('keys').classList.toggle('collapsed', keysCollapsed); $('keysToggle').setAttribute('aria-expanded', String(!keysCollapsed)); };
+  $('keysToggle').onclick = () => { keysCollapsed = !keysCollapsed; try { localStorage.setItem('wf-keys', keysCollapsed ? '1' : '0'); } catch (_) {} renderKeys(); };
+  renderKeys();
+  scheduleMinimap();
+
   // ---------- Admin-Funktionen ----------
-  let emote = null, emoteAct = null;
+  let emote = null, emoteAct = null, emoteUntil = 0;
   function fillEmotes() {
     const sel = $('emoteSel'); sel.innerHTML = '';
     if (!clips.length) { sel.innerHTML = '<option value="">– keine Animationen –</option>'; return; }
@@ -2010,10 +2263,12 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!mixer || $('emoteSel').value === '') return;
     playEmoteClip(clips[+$('emoteSel').value]);
   }
-  function stopEmote() { emote = null; emoteAct = null; }
-  function playEmoteClip(clip) {
+  function stopEmote() { emote = null; emoteAct = null; emoteUntil = 0; }
+  function playEmoteClip(clip, once) {
     if (!mixer || !clip) return;
-    emote = clip.name; emoteAct = mixer.clipAction(clip); emoteAct.setLoop(THREE.LoopRepeat);
+    emote = clip.name; emoteAct = mixer.clipAction(clip);
+    emoteAct.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); emoteAct.clampWhenFinished = !!once;
+    emoteUntil = once ? performance.now() + clip.duration * 1000 : 0;
   }
   // Charakterauswahl im Editor = Plätze, die ein Modell haben
   function renderEditor() {
