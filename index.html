@@ -138,7 +138,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 </div>
 
 <div class="hud party" id="party" aria-live="polite"></div>
-<p class="ver">v 03.11. 18:45</p>
+<p class="ver">v 03.11. 19:00</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -449,7 +449,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   });
   addEventListener('keyup', e => keys.delete(e.code));
-  addEventListener('blur', () => { keys.clear(); lmb = rmb = false; });
+  addEventListener('blur', () => { keys.clear(); lmb = rmb = false; if (typeof haltMovement === 'function') { haltMovement(); sendState(true); } });
 
   let facing = 0, camOff = 0, pitch = 0.3, dist = 8;
   let lmb = false, rmb = false;
@@ -1176,6 +1176,11 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (!net.ready) return;
     sendClock += dt; if (sendClock < 1 / 15) return; sendClock = 0;
     keepAlive += 1 / 15;
+    sendState(false);
+  }
+
+  function sendState(force) {
+    if (!net.ready) return;
     const me = mode === 'play'
       ? { m: 'play', n: shownName(), cn: myName(), c: myHue, p: [r2(player.position.x), r2(player.position.y), r2(player.position.z)], f: r2(facing), l: r2(lean), s: moveState,
           mk: myKey(), h: modelHeight, r: r2(rotOffset), a: !!(model && $('alpha').checked),
@@ -1184,13 +1189,27 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
           ...Object.fromEntries(ANIMS.map(a => [a.net, model ? clipName($(a.id)) : null])) }
       : { m: 'select', n: shownName(), cn: myName(), c: myHue, p: null, mk: null };
     const json = JSON.stringify(me);
-    if (json === lastSent && keepAlive < 2) return;
+    if (!force && json === lastSent && keepAlive < 2) return;
     lastSent = json; keepAlive = 0;
     netSend({ t: 's', id: net.id, st: me });
     // Mitspieler, von denen lange nichts kam, entfernen
     const now = performance.now();
-    for (const [id, at] of netSeen) if (now - at > 10000) netDrop(id);
+    for (const [id, at] of netSeen) if (now - at > 30000) netDrop(id);
   }
+
+  // Tab im Hintergrund: Der Browser hält die Spielschleife an. Figur stoppen und
+  // weiter ein Lebenszeichen senden, damit Mitspieler einen nicht einfrieren sehen oder verlieren.
+  function haltMovement() {
+    keys.clear(); lmb = rmb = false; autorun = false;
+    vel.set(0, 0, 0); leanTarget = 0;
+    if (onGround) moveState = 'idle';
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { haltMovement(); sendState(true); }
+    else clock.getDelta(); // aufgelaufene Zeit verwerfen
+  });
+  setInterval(() => { if (document.hidden) sendState(true); }, 1000);
 
   // ---------- Netzwerk: Peer-to-Peer über PeerJS ----------
   // Der Gastgeber ist der Knoten in der Mitte: Er empfängt die Stände aller und reicht sie an die anderen weiter.
