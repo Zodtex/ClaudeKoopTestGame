@@ -405,7 +405,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   </div>
 </div>
 <p class="fps" id="fpsBox" hidden></p>
-<p class="ver">v 04.11. 03:35</p>
+<p class="ver">v 04.11. 03:45</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -690,9 +690,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       </div>
       <input type="file" id="musicInput" multiple accept=".ogg,.mp3,.wav,audio/*" hidden>
       <input type="file" id="ambInput" multiple accept=".ogg,.mp3,.wav,audio/*" hidden>
+      <div class="field"><label for="audioPause">Pause</label><select id="audioPause"><option value="none">Keine – direkt weiter</option><option value="short">Kurz (5–12 s)</option><option value="wow">Wie in WoW (20–60 s)</option></select></div>
       <div class="netstate" id="audioState">Keine Musik.</div>
       <button class="btn ghost danger" id="audioClear">Musik &amp; Umgebung entfernen</button>
-      <p class="hint">In wow.export im Tab „Audio" z. B. nach „zonemusic/stranglethorn" (Musik) oder „ambience" (Vögel, Meer …) suchen und exportieren. Mehrere Dateien auf einmal wählen. Die Stücke laufen zufällig mit Pausen, die Umgebung in Schleife.</p>
+      <p class="hint">In wow.export im Tab „Audio" z. B. nach „zonemusic/stranglethorn" (Musik) oder „ambience" (Vögel, Meer …) suchen und exportieren. Mehrere Dateien auf einmal wählen; erneutes „Musik wählen" fügt weitere hinzu. Alle Stücke laufen einmal in zufälliger Reihenfolge, dann wird neu gemischt. Die Umgebung läuft in Schleife.</p>
     </div>
     <div class="asec">
       <span class="lbl">Himmel &amp; Licht</span>
@@ -2594,7 +2595,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   const cleanAudio = a => {
     if (!a || typeof a !== 'object') return null;
     const k = v => typeof v === 'string' && v.startsWith('audio:') ? v.slice(0, 220) : null;
-    const out = { music: k(a.music), amb: k(a.amb), mn: Number.isInteger(a.mn) ? a.mn : 0, an: Number.isInteger(a.an) ? a.an : 0 };
+    const out = { music: k(a.music), amb: k(a.amb), mn: Number.isInteger(a.mn) ? a.mn : 0, an: Number.isInteger(a.an) ? a.an : 0, pause: ['none', 'short', 'wow'].includes(a.pause) ? a.pause : 'wow' };
     return out.music || out.amb ? out : null;
   };
   const AU = { ctx: null, music: null, amb: null, gM: null, gA: null, filt: null, started: false, list: [], ambList: [], urls: [], next: 0, timer: 0, under: false, keyM: null, keyA: null };
@@ -2617,7 +2618,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
         AU.music = new Audio(); AU.amb = new Audio(); AU.amb.loop = true;
         AU.ctx.createMediaElementSource(AU.music).connect(AU.gM);
         AU.ctx.createMediaElementSource(AU.amb).connect(AU.gA);
-        AU.music.onended = () => scheduleNext(20000 + Math.random() * 40000); // Pause zwischen Stücken wie in WoW
+        AU.music.onended = () => scheduleNext(musicPause()); // Pause zwischen Stücken (einstellbar)
         AU.amb.onended = () => playAmb();
       } catch (e) { console.warn('Audio', e); return; }
     }
@@ -2626,11 +2627,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (AU.list.length && AU.music.paused && !AU.timer) playNext();
     if (AU.ambList.length && AU.amb.paused) playAmb();
   }
+  function musicPause() {
+    const p = mapCfg && mapCfg.audio && mapCfg.audio.pause;
+    return p === 'none' ? 300 : p === 'short' ? 4000 + Math.random() * 8000 : 20000 + Math.random() * 40000;
+  }
   function scheduleNext(ms) { clearTimeout(AU.timer); AU.timer = setTimeout(() => { AU.timer = 0; playNext(); }, ms); }
+  // Zufallswiedergabe: jedes Stück einmal in gemischter Reihenfolge, dann neu mischen
   function playNext() {
     if (!AU.started || !AU.list.length) return;
-    let i = Math.floor(Math.random() * AU.list.length);
-    if (AU.list.length > 1 && i === AU.last) i = (i + 1) % AU.list.length;
+    if (!AU.bag || !AU.bag.length || AU.bag.some(i => i >= AU.list.length)) {
+      AU.bag = AU.list.map((_, i) => i);
+      for (let i = AU.bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [AU.bag[i], AU.bag[j]] = [AU.bag[j], AU.bag[i]]; }
+      if (AU.bag.length > 1 && AU.bag[0] === AU.last) AU.bag.push(AU.bag.shift()); // nicht zweimal dasselbe hintereinander
+    }
+    const i = AU.bag.shift();
     AU.last = i;
     AU.music.src = AU.list[i].url; AU.music.play().catch(() => {});
     $('sndNow').textContent = '♪ ' + AU.list[i].name;
@@ -2655,7 +2665,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (fm) audioHave.add(km); if (fa) audioHave.add(ka);
     stopAudio(); AU.urls.forEach(URL.revokeObjectURL); AU.urls = [];
     const mk = files => (files || []).filter(f => /\.(ogg|mp3|wav)$/i.test(f.name)).map(f => { const url = URL.createObjectURL(f); AU.urls.push(url); return { url, name: f.name.replace(/\.[^.]+$/, '') }; });
-    AU.list = mk(fm); AU.ambList = mk(fa); AU.keyM = km; AU.keyA = ka;
+    AU.list = mk(fm); AU.ambList = mk(fa); AU.bag = []; AU.keyM = km; AU.keyA = ka;
     renderAudioAdmin();
     if (AU.started) { if (AU.list.length) playNext(); if (AU.ambList.length) playAmb(); }
   }
@@ -2670,6 +2680,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   }
   function renderAudioAdmin() {
     const a = mapCfg && mapCfg.audio, has = !!mapCfg;
+    $('audioPause').value = (a && a.pause) || 'wow'; $('audioPause').disabled = !has;
     ['musicPick', 'ambPick', 'audioClear'].forEach(id => $(id).disabled = !has);
     const e = $('audioState');
     if (!has) { e.textContent = 'Erst eine Karte laden.'; e.className = 'netstate'; return; }
@@ -2680,14 +2691,20 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   async function pickAudio(kind, list) {
     const files = [...list].filter(f => /\.(ogg|mp3|wav)$/i.test(f.name));
     if (!files.length || !mapCfg || !isAdmin) { $('audioState').textContent = 'Keine .ogg/.mp3-Dateien gewählt.'; $('audioState').className = 'netstate err'; return; }
-    const key = audioKey(kind, files);
-    sharedPut(key, files); audioHave.add(key);
-    mapCfg.audio = Object.assign({ music: null, amb: null, mn: 0, an: 0 }, mapCfg.audio, kind === 'music' ? { music: key, mn: files.length } : { amb: key, an: files.length });
+    // Weitere Stücke werden zu den vorhandenen hinzugefügt (gleiche Dateien nur einmal)
+    const oldKey = mapCfg.audio && mapCfg.audio[kind === 'music' ? 'music' : 'amb'];
+    const old = oldKey ? (await sharedGet(oldKey)) || [] : [];
+    const all = [...old];
+    for (const f of files) if (!all.some(o => o.name === f.name && o.size === f.size)) all.push(f);
+    const key = audioKey(kind, all);
+    sharedPut(key, all); audioHave.add(key);
+    mapCfg.audio = Object.assign({ music: null, amb: null, mn: 0, an: 0, pause: 'wow' }, mapCfg.audio, kind === 'music' ? { music: key, mn: all.length } : { amb: key, an: all.length });
     AU.keyM = AU.keyA = undefined; // neu aufbauen
     await setupAudio(); broadcastMap();
     if (!AU.started) { $('audioState').textContent += ' · startet beim nächsten „Spielen"'; }
   }
   $('musicPick').onclick = () => $('musicInput').click();
+  $('audioPause').onchange = e => { if (!mapCfg) return; mapCfg.audio = Object.assign({ music: null, amb: null, mn: 0, an: 0 }, mapCfg.audio, { pause: e.target.value }); broadcastMap(); };
   $('ambPick').onclick = () => $('ambInput').click();
   $('musicInput').onchange = e => { pickAudio('music', e.target.files); e.target.value = ''; };
   $('ambInput').onchange = e => { pickAudio('amb', e.target.files); e.target.value = ''; };
