@@ -132,6 +132,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <div class="btnrow">
         <button class="btn ghost" id="hostBtn">Spiel erstellen</button>
       </div>
+      <label class="check"><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
       <div class="joinrow">
         <input type="text" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Spielcode">
         <button class="btn ghost" id="joinBtn">Beitreten</button>
@@ -583,7 +584,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     } else {
       ['animIdle', 'animWalk', 'animBack'].forEach(id => fillSelect($(id), [], null, -1));
     }
-    $('modelSettings').disabled = false;
+    $('modelSettings').disabled = rosterMode;
     $('animIdle').disabled = $('animWalk').disabled = $('animBack').disabled = !clips.length;
     $('height').value = settings?.height ?? 2;
     $('heightVal').textContent = `${(+$('height').value).toFixed(1)} m`;
@@ -700,7 +701,10 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       } catch (_) { res(null); }
     });
   }
+  let rosterMode = false, ownSlots = null, rosterHost = '', rosterTimer = 0;
   function dbPut(i) {
+    if (rosterMode) return; // vorgegebene Charaktere des Spielleiters nicht als eigene speichern
+    if (typeof scheduleRoster === 'function') scheduleRoster();
     if (!db) return;
     try {
       const st = db.transaction('slots', 'readwrite').objectStore('slots');
@@ -734,7 +738,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const has = sl && sl.files && sl.files.length;
       b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
       b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
-      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : 'Leer · Platzhalter';
+      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? 'wird übertragen …' : 'Leer · Platzhalter';
       b.onclick = () => activateSlot(i);
       b.ondblclick = () => { activateSlot(i); enterPlay(); };
       list.append(b);
@@ -743,6 +747,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     $('slotName').placeholder = `Charakter ${active + 1}`;
     const has = slots[active] && slots[active].files && slots[active].files.length;
     $('slotClear').disabled = !slots[active];
+    if (rosterMode) lockUI(true);
   }
 
   function showPlaceholder(msg) {
@@ -756,6 +761,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     renderSlots();
     const sl = slots[i];
     if (sl && sl.files && sl.files.length) loadFiles(sl.files, sl.settings, false);
+    else if (rosterMode && sl && sl.mk) showPlaceholder('Charakter wird vom Spielleiter übertragen …');
+    else if (rosterMode) showPlaceholder('Diesen Platz hat der Spielleiter leer gelassen.');
     else showPlaceholder('Leerer Platz. Lade einen Ordner aus wow.export oder spiel mit dem Platzhalter.');
   }
 
@@ -1005,6 +1012,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!prev || prev.n !== msg.st.n || prev.m !== msg.st.m || prev.c !== msg.st.c) renderParty();
     } else if (msg.t === 'l') {
       netDrop(msg.id);
+    } else if (msg.t === 'roster') {
+      if (!net.host) applyRoster(msg.id, msg.list);
     } else if (msg.t === 'req' || msg.t === 'f') {
       if (msg.to !== net.id) { if (net.host) netSendTo(msg.to, msg, conn); return; } // Gastgeber leitet weiter
       if (msg.t === 'req') sendMyModel(msg.id, msg.mk);
@@ -1064,11 +1073,64 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     incoming.delete(m.mk);
     sharedPut(m.mk, inc.files);
     for (const R of remotes.values()) if (R.mk === m.mk && !R.model) loadRemoteModel(R, R.lastPr || {});
+    if (rosterMode) {
+      slots.forEach(sl => { if (sl && sl.mk === m.mk) sl.files = inc.files; });
+      renderSlots();
+      if (slots[active] && slots[active].mk === m.mk && !model) activateSlot(active);
+    }
+  }
+
+  // ---------- Vorgegebene Charaktere (Spielleiter) ----------
+  function rosterList() {
+    return slots.map(sl => sl && sl.main && sl.files && sl.files.length
+      ? { mk: sl.main.toLowerCase(), main: sl.main, name: sl.name || '', settings: sl.settings || null }
+      : (sl && sl.name ? { name: sl.name } : null));
+  }
+  function scheduleRoster() {
+    if (!net.host || !net.ready) return;
+    clearTimeout(rosterTimer);
+    rosterTimer = setTimeout(() => netSend({ t: 'roster', id: net.id, list: $('fixRoster').checked ? rosterList() : null }), 500);
+  }
+  function lockUI(on) {
+    ['slotFolder', 'slotFiles', 'slotClear', 'slotName', 'resetModel'].forEach(id => $(id).disabled = on);
+    if (on) $('modelSettings').disabled = true;
+    else $('modelSettings').disabled = !model;
+  }
+  async function applyRoster(hostId, list) {
+    if (list === null) { leaveRoster(); return; }
+    if (!Array.isArray(list) || list.length !== 3) return;
+    const str = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
+    const next = list.map(e => {
+      if (!e || typeof e !== 'object') return null;
+      const mk = str(e.mk, 200).toLowerCase();
+      const set = e.settings && typeof e.settings === 'object' ? e.settings : null;
+      return mk ? { name: str(e.name, 24), main: str(e.main, 200), mk, settings: set, files: [] } : { name: str(e.name, 24), files: [] };
+    });
+    const prev = rosterMode && slots[active] ? JSON.stringify([slots[active].mk, slots[active].settings]) : null;
+    if (!rosterMode) { ownSlots = slots; rosterMode = true; }
+    rosterHost = hostId;
+    slots = next;
+    for (const sl of slots) {
+      if (!sl || !sl.mk) continue;
+      const files = await sharedGet(sl.mk);
+      if (files) sl.files = files; else requestModel(hostId, sl.mk);
+    }
+    if (!rosterMode) return; // inzwischen getrennt
+    netMsg(`Verbunden mit Spiel ${net.code}. Der Spielleiter gibt die Charaktere vor.`, 'ok');
+    const same = prev && slots[active] && JSON.stringify([slots[active].mk, slots[active].settings]) === prev && model;
+    if (same) renderSlots(); // eigener Charakter unverändert: nicht neu laden
+    else activateSlot(prev && slots[active] && slots[active].mk ? active : Math.max(0, slots.findIndex(sl => sl && sl.mk)));
+  }
+  function leaveRoster() {
+    if (!rosterMode) return;
+    rosterMode = false; slots = ownSlots || [null, null, null]; ownSlots = null; rosterHost = '';
+    lockUI(false);
+    activateSlot(Math.max(0, slots.findIndex(sl => sl && sl.files && sl.files.length)));
   }
   function wireConn(conn) {
     conn.on('open', () => {
       net.conns.add(conn); net.ready = true; lastSent = '';
-      if (net.host) for (const [id, st] of netStates) conn.send({ t: 's', id, st }); // Neuankömmling bekommt alle bekannten Stände
+      if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked) conn.send({ t: 'roster', id: net.id, list: rosterList() }); } // Neuankömmling bekommt alle bekannten Stände
       else netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok');
       if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
@@ -1078,12 +1140,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       if (!net.conns.has(conn)) return;
       net.conns.delete(conn);
       if (net.host) { (connIds.get(conn) || []).forEach(netDrop); connIds.delete(conn); netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok'); }
-      else { for (const id of [...netStates.keys()]) netDrop(id); net.ready = false; netMsg('Verbindung zum Gastgeber verloren.', 'err'); }
+      else { for (const id of [...netStates.keys()]) netDrop(id); net.ready = false; leaveRoster(); netMsg('Verbindung zum Gastgeber verloren.', 'err'); }
       renderParty();
     };
     conn.on('close', gone); conn.on('error', gone);
   }
   function netReset() {
+    leaveRoster();
     for (const c of net.conns) { try { c.close(); } catch (_) {} }
     net.conns.clear(); connIds.clear();
     if (net.peer) { try { net.peer.destroy(); } catch (_) {} }
@@ -1129,6 +1192,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     renderParty();
   }
   $('hostBtn').onclick = () => hostGame();
+  $('fixRoster').onchange = () => scheduleRoster();
   $('joinBtn').onclick = () => joinGame($('joinCode').value);
   $('joinCode').onkeydown = e => { if (e.key === 'Enter') joinGame(e.target.value); };
   $('copyCode').onclick = async () => {
