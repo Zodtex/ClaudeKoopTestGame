@@ -235,7 +235,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 03.11. 23:30</p>
+<p class="ver">v 03.11. 23:35</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -1187,7 +1187,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function enterPlay() {
     mode = 'play'; resetPlayer();
     audioStart();
-    $('selectPanel').hidden = true; $('panel').hidden = true; // Charakterwechsel jetzt im Esc-Menü $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
+    $('selectPanel').hidden = true; $('panel').hidden = true; /* Charakterwechsel jetzt im Esc-Menü */ $('keys').hidden = !settings.keys; $('chat').hidden = false; $('minimap').hidden = !settings.minimap;
     if (worldLeft) { worldLeft = false; autoJoin(); }
     renderNameBar(); renderParty();
     canvas.focus();
