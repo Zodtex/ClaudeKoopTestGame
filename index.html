@@ -76,7 +76,7 @@ select { width: 100%; min-width: 0; background: #1b2229; color: var(--parch); bo
 .party .mem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .party .mem small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 10.5px; flex: none; }
 .adminbtn { right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); background: rgba(208,166,78,0.22); color: var(--parch); border: 1px solid var(--gold); border-radius: 4px; padding: 7px 14px; font: 600 12px var(--f-display); letter-spacing: 0.1em; cursor: pointer; }
-.adminpanel { top: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); width: 300px; max-height: calc(100% - 90px); border-color: rgba(208,166,78,0.55); z-index: 3; }
+.panel.adminpanel { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: min(340px, calc(100% - 32px)); max-height: calc(100% - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); border-color: rgba(208,166,78,0.55); z-index: 3; box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
 .field.anim { grid-template-columns: 82px minmax(0, 1fr) auto; }
 .pv { padding: 4px 8px; }
 .asec { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
