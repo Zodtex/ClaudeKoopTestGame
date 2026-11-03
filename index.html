@@ -174,7 +174,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   <div class="mmzone" id="mmZone">Übungsfeld</div>
   <div class="mmzoom"><button id="mmIn" title="Hineinzoomen" aria-label="Minimap hineinzoomen">+</button><button id="mmOut" title="Herauszoomen" aria-label="Minimap herauszoomen">−</button></div>
 </div>
-<p class="ver">v 03.11. 20:15</p>
+<p class="ver">v 03.11. 20:30</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -1897,6 +1897,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   // ---------- Wasser ----------
   let water = null, waterTex = null, mapTop = 100;
+  const waterTime = { value: 0 };
   const cleanWater = w => w && typeof w === 'object' && Number.isFinite(+w.level) ? { on: !!w.on, level: Math.max(-1000, Math.min(5000, +w.level)), block: !!w.block } : null;
   // Begehbar: Boden vorhanden und – wenn das Schwimmen gesperrt ist – nicht tiefer als die Schwimmhöhe
   function walkable(x, z) {
@@ -1920,11 +1921,43 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (wl === null || !mapIndex) { if (water) water.visible = false; return; }
     if (!water) {
       waterTex = waterTexture();
-      water = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshPhongMaterial({ map: waterTex, color: 0xffffff, transparent: true, opacity: 0.78, shininess: 80, specular: 0x6688aa, depthWrite: false, side: THREE.DoubleSide }));
+      const mat = new THREE.MeshPhongMaterial({ map: waterTex, color: 0xffffff, transparent: true, opacity: 0.8, shininess: 160, specular: 0x3a5566, depthWrite: false, side: THREE.DoubleSide });
+      // Wellen im Vertex-Shader, zwei gegeneinander laufende Texturschichten im Fragment-Shader
+      mat.onBeforeCompile = sh => {
+        sh.uniforms.uTime = waterTime;
+        sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader
+          .replace('#include <beginnormal_vertex>', `
+            vec2 wp = (modelMatrix * vec4(position, 1.0)).xz;
+            float a1 = wp.x * 0.12 + uTime * 1.3, a2 = wp.y * 0.09 - uTime * 1.1 + wp.x * 0.05, a3 = (wp.x + wp.y) * 0.25 + uTime * 2.1;
+            float dhx = cos(a1) * 0.12 * 0.18 + cos(a2) * 0.05 * 0.14 + cos(a3) * 0.25 * 0.05;
+            float dhz = cos(a2) * 0.09 * 0.14 + cos(a3) * 0.25 * 0.05;
+            vec3 objectNormal = normalize(vec3(-dhx, dhz, 1.0));
+            #ifdef USE_TANGENT
+              vec3 objectTangent = vec3(tangent.xyz);
+            #endif`)
+          .replace('#include <begin_vertex>', `
+            vec3 transformed = vec3(position);
+            transformed.z += sin(a1) * 0.18 + sin(a2) * 0.14 + sin(a3) * 0.05;`);
+        sh.fragmentShader = 'uniform float uTime;\n' + sh.fragmentShader
+          .replace('#include <map_fragment>', `
+            #ifdef USE_MAP
+              vec4 w1 = texture2D(map, vUv + uTime * vec2(0.012, 0.006));
+              vec4 w2 = texture2D(map, vUv * 1.37 + uTime * vec2(-0.009, 0.011));
+              diffuseColor *= mix(w1, w2, 0.5) * 1.08;
+            #endif`);
+      };
+      water = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
       water.rotation.x = -Math.PI / 2; water.renderOrder = 2; scene.add(water);
     }
     const I = mapIndex, w = I.maxX - I.minX + 600, d = I.maxZ - I.minZ + 600;
-    water.scale.set(w, d, 1); water.position.set((I.minX + I.maxX) / 2, wl, (I.minZ + I.maxZ) / 2);
+    // Echte Größe statt Skalierung, damit die Wellen-Normalen stimmen
+    const key = Math.round(w) + 'x' + Math.round(d);
+    if (water.userData.size !== key) {
+      water.geometry.dispose();
+      water.geometry = new THREE.PlaneGeometry(w, d, Math.min(320, Math.ceil(w / 5)), Math.min(320, Math.ceil(d / 5)));
+      water.userData.size = key;
+    }
+    water.position.set((I.minX + I.maxX) / 2, wl, (I.minZ + I.maxZ) / 2);
     waterTex.repeat.set(w / 24, d / 24);
     water.visible = true;
   }
@@ -1961,7 +1994,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     scene.background.copy(under ? deepCol : skyCol);
     scene.fog.color.copy(under ? deepCol : skyCol);
     scene.fog.near = under ? 0 : fogNear; scene.fog.far = under ? 45 : fogFar;
-    if (waterTex && water && water.visible) { waterTex.offset.x += dt * 0.012; waterTex.offset.y += dt * 0.006; }
+    if (water && water.visible) waterTime.value += dt;
   }
   function renderEnvAdmin() {
     const has = !!(mapCfg && mapLoaded);
