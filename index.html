@@ -125,6 +125,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <button class="btn ghost" id="slotFolder">Ordner laden</button>
       <button class="btn ghost" id="slotFiles">Dateien laden</button>
     </div>
+    <p class="hint" id="rosterInfo" hidden></p>
     <div class="status" id="selStatus">Lade gespeicherte Charaktere …</div>
     <button class="btn ghost danger" id="slotClear">Platz leeren</button>
     <div class="coop">
@@ -132,7 +133,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       <div class="btnrow">
         <button class="btn ghost" id="hostBtn">Spiel erstellen</button>
       </div>
-      <label class="check"><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
+      <label class="check" id="fixRosterRow"><input type="checkbox" id="fixRoster" checked> Als Spielleiter meine 3 Charaktere für alle vorgeben</label>
       <div class="joinrow">
         <input type="text" id="joinCode" maxlength="5" placeholder="Code" autocomplete="off" spellcheck="false" aria-label="Spielcode">
         <button class="btn ghost" id="joinBtn">Beitreten</button>
@@ -538,6 +539,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     });
   }
   async function loadFiles(fileList, settings = null, persist = true) {
+    if (persist && rosterSource === 'repo') return importExportFolder(fileList);
     const files = [...fileList].filter(f => MODEL_EXT.test(f.name));
     if (!files.length) { status('Keine Modelldateien gefunden (.gltf, .glb, .obj, .bin, .mtl, .png).', 'err'); return; }
     const slotAtStart = active;
@@ -701,6 +703,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       } catch (_) { res(null); }
     });
   }
+  let rosterSource = '', repoRoster = null;
   let rosterMode = false, ownSlots = null, rosterHost = '', rosterTimer = 0;
   function dbPut(i) {
     if (rosterMode) return; // vorgegebene Charaktere des Spielleiters nicht als eigene speichern
@@ -738,7 +741,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       const has = sl && sl.files && sl.files.length;
       b.innerHTML = `<span class="n">${ROMAN[i]}</span><span class="nm"></span><span class="meta"></span>`;
       b.querySelector('.nm').textContent = (sl && sl.name) || `Charakter ${i + 1}`;
-      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? 'wird übertragen …' : 'Leer · Platzhalter';
+      b.querySelector('.meta').textContent = has ? (sl.main || `${sl.files.length} Dateien`) : (sl && sl.mk) ? (rosterSource === 'repo' ? 'fehlt · Exportordner wählen' : 'wird übertragen …') : 'Leer · Platzhalter';
       b.onclick = () => activateSlot(i);
       b.ondblclick = () => { activateSlot(i); enterPlay(); };
       list.append(b);
@@ -761,6 +764,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     renderSlots();
     const sl = slots[i];
     if (sl && sl.files && sl.files.length) loadFiles(sl.files, sl.settings, false);
+    else if (rosterSource === 'repo' && sl && sl.mk) showPlaceholder(`Fehlt noch: Exportiere ${sl.path} mit wow.export als glTF und wähle deinen Exportordner.`);
     else if (rosterMode && sl && sl.mk) showPlaceholder('Charakter wird vom Spielleiter übertragen …');
     else if (rosterMode) showPlaceholder('Diesen Platz hat der Spielleiter leer gelassen.');
     else showPlaceholder('Leerer Platz. Lade einen Ordner aus wow.export oder spiel mit dem Platzhalter.');
@@ -1087,16 +1091,18 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
       : (sl && sl.name ? { name: sl.name } : null));
   }
   function scheduleRoster() {
-    if (!net.host || !net.ready) return;
+    if (!net.host || !net.ready || rosterSource === 'repo') return;
     clearTimeout(rosterTimer);
     rosterTimer = setTimeout(() => netSend({ t: 'roster', id: net.id, list: $('fixRoster').checked ? rosterList() : null }), 500);
   }
   function lockUI(on) {
     ['slotFolder', 'slotFiles', 'slotClear', 'slotName', 'resetModel'].forEach(id => $(id).disabled = on);
+    if (on && rosterSource === 'repo') $('slotFolder').disabled = false; // Exportordner darf man wählen
     if (on) $('modelSettings').disabled = true;
     else $('modelSettings').disabled = !model;
   }
   async function applyRoster(hostId, list) {
+    if (rosterSource === 'repo') return; // feste Liste aus dem Spiel hat Vorrang
     if (list === null) { leaveRoster(); return; }
     if (!Array.isArray(list) || list.length !== 3) return;
     const str = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';
@@ -1108,7 +1114,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     });
     const prev = rosterMode && slots[active] ? JSON.stringify([slots[active].mk, slots[active].settings]) : null;
     if (!rosterMode) { ownSlots = slots; rosterMode = true; }
-    rosterHost = hostId;
+    rosterSource = 'host'; rosterHost = hostId;
     slots = next;
     for (const sl of slots) {
       if (!sl || !sl.mk) continue;
@@ -1122,7 +1128,8 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     else activateSlot(prev && slots[active] && slots[active].mk ? active : Math.max(0, slots.findIndex(sl => sl && sl.mk)));
   }
   function leaveRoster() {
-    if (!rosterMode) return;
+    if (!rosterMode || rosterSource !== 'host') return;
+    rosterSource = '';
     rosterMode = false; slots = ownSlots || [null, null, null]; ownSlots = null; rosterHost = '';
     lockUI(false);
     activateSlot(Math.max(0, slots.findIndex(sl => sl && sl.files && sl.files.length)));
@@ -1130,7 +1137,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   function wireConn(conn) {
     conn.on('open', () => {
       net.conns.add(conn); net.ready = true; lastSent = '';
-      if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked) conn.send({ t: 'roster', id: net.id, list: rosterList() }); } // Neuankömmling bekommt alle bekannten Stände
+      if (net.host) { for (const [id, st] of netStates) conn.send({ t: 's', id, st }); if ($('fixRoster').checked && rosterSource !== 'repo') conn.send({ t: 'roster', id: net.id, list: rosterList() }); } // Neuankömmling bekommt alle bekannten Stände
       else netMsg(`Verbunden mit Spiel ${net.code}.`, 'ok');
       if (net.host) netMsg(`Spiel ${net.code} offen · ${net.conns.size} Mitspieler verbunden.`, 'ok');
       renderParty();
@@ -1203,9 +1210,78 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   addEventListener('beforeunload', () => { if (net.ready) netSend({ t: 'l', id: net.id }); });
   function startCoop() { renderParty(); }
 
+  // ---------- Feste Charakterliste aus dem Spiel (roster.json, enthält nur Pfade, keine Blizzard-Dateien) ----------
+  async function fetchRoster() {
+    try {
+      const r = await fetch('roster.json', { cache: 'no-cache' });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const list = (Array.isArray(j.characters) ? j.characters : []).slice(0, 3).filter(c => c && typeof c.path === 'string' && c.path);
+      return list.length ? list : null;
+    } catch (_) { return null; }
+  }
+  const stemOf = path => path.toLowerCase().replace(/\\/g, '/').replace(/\.(m2|wmo|gltf|glb|obj)$/, '');
+  async function enterRepoRoster(list) {
+    ownSlots = slots; rosterMode = true; rosterSource = 'repo';
+    const next = [null, null, null];
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i], stem = stemOf(c.path), mk = stem.split('/').pop() + '.gltf';
+      const settings = { height: Number.isFinite(c.height) ? c.height : 2, alpha: !!c.alpha };
+      if (Number.isFinite(c.rotation)) settings.rot = c.rotation * Math.PI / 180;
+      next[i] = { name: String(c.name || stem.split('/').pop()).slice(0, 24), main: mk, mk, path: c.path, stem, settings, files: [] };
+      const files = await sharedGet(mk);
+      if (files) next[i].files = files;
+    }
+    slots = next;
+    $('fixRosterRow').hidden = true;
+    $('slotFolder').textContent = 'Exportordner wählen';
+    const info = $('rosterInfo'); info.hidden = false;
+    info.textContent = 'Die Charaktere sind im Spiel vorgegeben. Exportiere sie einmal mit wow.export (Format glTF) aus deiner eigenen WoW-Installation und wähle dann deinen wow.export-Ordner.';
+  }
+
+  // Sucht im Exportordner die Modelle der Liste samt .bin und Texturen
+  async function importExportFolder(fileList) {
+    const files = [...fileList];
+    const rel = f => (f.webkitRelativePath || f.name).replace(/\\/g, '/').toLowerCase();
+    const found = [], missing = [];
+    status('Durchsuche Exportordner …');
+    for (const sl of slots) {
+      if (!sl || !sl.stem) continue;
+      const leaf = sl.stem.split('/').pop();
+      const isModel = f => /\.gltf$/i.test(f.name);
+      const main = files.find(f => isModel(f) && rel(f).replace(/\.gltf$/, '').endsWith(sl.stem))
+        || files.find(f => isModel(f) && base(f.name) === leaf + '.gltf');
+      if (!main) { missing.push(sl.name); continue; }
+      let deps = [];
+      try {
+        const json = JSON.parse(await main.text());
+        const uris = [...(json.buffers || []), ...(json.images || [])].map(x => x && x.uri).filter(u => typeof u === 'string' && !u.startsWith('data:'));
+        const dir = rel(main).split('/').slice(0, -1);
+        for (const u of uris) {
+          const parts = dir.slice();
+          decodeURIComponent(u).replace(/\\/g, '/').toLowerCase().split('/').forEach(seg => { if (seg === '..') parts.pop(); else if (seg && seg !== '.') parts.push(seg); });
+          const want = parts.join('/'), b = parts[parts.length - 1];
+          const hit = files.find(f => rel(f).endsWith(want)) || files.find(f => base(f.name) === b);
+          if (hit) deps.push(hit);
+        }
+      } catch (e) { console.warn(e); }
+      const set = [main, ...deps.filter((f, i, a) => a.indexOf(f) === i)];
+      sl.files = set;
+      sharedPut(sl.mk, set);
+      found.push(sl.name);
+    }
+    renderSlots();
+    if (slots[active] && slots[active].files.length) activateSlot(active);
+    else { const i = slots.findIndex(sl => sl && sl.files && sl.files.length); if (i >= 0) activateSlot(i); }
+    if (missing.length) status(`Gefunden: ${found.join(', ') || 'nichts'}. Fehlt noch: ${missing.join(', ')} – exportiere ${missing.length > 1 ? 'sie' : 'es'} mit wow.export als glTF.`, 'err');
+    else if (found.length) status(`Alle Charaktere gefunden: ${found.join(', ')}.`, 'ok');
+  }
+
   (async () => {
     db = await openDB();
     slots = await dbLoad();
+    repoRoster = await fetchRoster();
+    if (repoRoster) await enterRepoRoster(repoRoster);
     const first = slots.findIndex(sl => sl && sl.files && sl.files.length);
     enterSelect();
     activateSlot(first >= 0 ? first : 0);

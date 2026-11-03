@@ -1,0 +1,11 @@
+{
+  "_hinweis": "Nur Pfade und Einstellungen. Die Modelle exportiert jeder Spieler selbst mit wow.export (glTF) aus seiner eigenen WoW-Installation.",
+  "characters": [
+    {
+      "name": "Tarecgosa",
+      "path": "creature/dragonwhelp/dragonwhelptarecgosa.m2",
+      "height": 1.4,
+      "alpha": true
+    }
+  ]
+}
