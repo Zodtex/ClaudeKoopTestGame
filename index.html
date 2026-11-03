@@ -642,7 +642,13 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
 
   function fitModel() {
     if (!model) return;
-    if (mixer && (actIdle || actWalk)) { mixer.stopAllAction(); current = null; setAction(actIdle || actWalk); mixer.update(0); }
+    // In der Stand-Pose mit vollem Gewicht messen (genau wie bei Mitspielern), sonst misst man die Bind-Pose
+    if (mixer && (actIdle || actWalk)) {
+      mixer.stopAllAction();
+      const a = actIdle || actWalk;
+      a.reset(); a.setEffectiveWeight(1); a.play(); mixer.update(0);
+      current = a;
+    }
     const target = parseFloat($('height').value);
     fitInto(pivot, model, target, rotOffset);
     modelHeight = target;
@@ -889,7 +895,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     if (R.mixer) {
       R.mixer.stopAllAction(); R.cur = null;
       R.acts = { idle: byName(pr.ai), walk: byName(pr.aw), back: byName(pr.ab) };
-      const pose = R.acts.idle || R.acts.walk; if (pose) { pose.reset().play(); R.cur = pose; R.mixer.update(0); }
+      const pose = R.acts.idle || R.acts.walk; if (pose) { pose.reset(); pose.setEffectiveWeight(1); pose.play(); R.cur = pose; R.mixer.update(0); }
     }
     fitInto(R.pv, R.model, R.h, typeof pr.r === 'number' ? pr.r : -Math.PI / 2);
   }
