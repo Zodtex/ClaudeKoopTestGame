@@ -399,7 +399,7 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
     <div class="lp"><span id="loadPct">0 %</span><span id="loadDetail"></span></div>
   </div>
 </div>
-<p class="ver">v 04.11. 02:50</p>
+<p class="ver">v 04.11. 03:00</p>
 
 <div class="hud namebar" id="nameBar">
   <label for="playerName" class="nb-lbl">Dein Name</label>
@@ -3019,12 +3019,16 @@ body { margin: 0; } *, *::before, *::after { box-sizing: border-box; } [hidden] 
   });
   $('ufEl').onchange = e => { ufEl = e.target.value; renderElInputs(); };
   $('ufElReset').onclick = () => setFrame({ [ufWhich + 'L']: null });
-  $('ufPreset').onclick = () => {
+  $('ufPreset').onclick = async () => {
     if (!uiCfg || !uiCfg[ufWhich]) { $('ufState').textContent = 'Erst die Grafik für diesen Rahmen wählen.'; return; }
+    // Ausschnitt als Anteil der Bildgröße (WoW-TexCoords), damit es auch bei hochauflösenden Exporten passt
+    const f = await sharedGet(uiCfg[ufWhich]); if (!f || !f[0]) return;
+    const bmp = await createImageBitmap(f[0]), w = bmp.width, h = bmp.height;
     uiCfg.crop = uiCfg.crop || {};
-    if (ufWhich === 'pf') { uiCfg.crop.pf = [[24, 0, 232, 100]]; setFrame({ pfF: true, pfL: null, pfW: 232, pfX: -12, pfY: -10 }); }
-    else { uiCfg.crop.pa = [[0, 0, 128, 53]]; setFrame({ paF: false, paL: null, paW: 160, paX: 0, paY: 0 }); }
+    if (ufWhich === 'pf') { uiCfg.crop.pf = [[Math.round(w * 0.09375), 0, Math.round(w * 0.90625), Math.round(h * 0.78125)]]; setFrame({ pfF: true, pfL: null, pfW: 232, pfX: 0, pfY: 0 }); }
+    else { uiCfg.crop.pa = [[0, 0, w, Math.round(h * 53 / 64)]]; setFrame({ paF: false, paL: null, paW: 160, paX: 0, paY: 0 }); }
     applyUi();
+    $('ufState').textContent = `Vorlage gesetzt (Bild ${w} × ${h} px).`;
   };
   $('ufElDrag').onchange = e => { $('unitFrames').classList.toggle('eledit', e.target.checked); if (e.target.checked) $('adminPanel').hidden = true; };
   // Ziehen im Spiel
