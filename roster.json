@@ -28,7 +28,7 @@
     {
       "name": "Dragonwhelp",
       "path": "creature/dragonwhelp/dragonwhelp.m2",
-      "height": 1.4,
+      "height": 2,
       "alpha": true,
       "idle": "Stand (ID 0 variation 0)",
       "walk": "Run (ID 5 variation 1)",
