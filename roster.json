@@ -23,20 +23,22 @@
       "back": "Walkbackwards (ID 13 variation 0)",
       "sl": "ShuffleLeft (ID 11 variation 0)",
       "sr": "ShuffleRight (ID 12 variation 0)",
-      "jump": "JumpStart (ID 37 variation 0)"
+      "jump": "JumpStart (ID 37 variation 0)",
+      "swim": "Swim (ID 42 variation 0)",
+      "swimidle": "SwimIdle (ID 41 variation 0)"
     },
     {
       "name": "Dragonwhelp",
       "path": "creature/dragonwhelp/dragonwhelp.m2",
       "height": 2,
       "alpha": true,
+      "lift": 0.3,
       "idle": "Stand (ID 0 variation 0)",
       "walk": "Run (ID 5 variation 1)",
       "back": null,
       "sl": null,
       "sr": null,
-      "jump": null,
-      "lift": 0.3
+      "jump": null
     }
   ],
   "map": {
@@ -57,6 +59,12 @@
       "fog": 650,
       "light": 0.75,
       "sun": 45
+    },
+    "audio": {
+      "music": "audio:music:mus_c_stranglethorn_2.mp3:1487129",
+      "amb": null,
+      "mn": 1,
+      "an": 0
     }
   }
 }
